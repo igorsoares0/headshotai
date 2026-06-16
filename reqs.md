@@ -4,7 +4,22 @@
 
 ## Spec-Driven Development
 
-Version: 1.0
+Version: 1.1
+
+---
+
+## Changelog — 1.0 → 1.1
+
+* Added quantitative **Success Criteria & KPIs** (§3) and **Non-Functional Requirements** (§4) — the spec is now measurable.
+* Reworked the generation core: **Dataset Preparation** (§11), trigger-word/captioning strategy in **Identity Training** (§12), corrected **Prompt System** conceptual error (§14), defined the **over-generation ratio** (§15), and turned identity into a hard **gate** in **Quality Gating & Ranking** (§16).
+* Redefined **AI Templates** as full parameter sets, not just prompts (§13).
+* Added **Identity Method Strategy** (LoRA vs. instant/few-shot, hybrid) (§18).
+* Promoted persistent identity model from "future" to core.
+* Added an explicit **Credit Model** (§8) and reconciled it with packages.
+* Defined **Order lifecycle, failure & retry semantics** (§20).
+* Hardened **Security, Privacy & Compliance** for biometric data (§29) and added **Content Safety & Misuse Prevention** (§30) and **Observability & Cost Controls** (§31).
+* Expanded **Database Models** with concrete fields and a `Package` model (§27).
+* Added **Model & Config Versioning** (§33).
 
 ---
 
@@ -22,7 +37,7 @@ The platform should provide an experience comparable to industry leaders such as
 6. Gallery delivery
 7. Download and favorites
 
-The primary goal is maximizing facial identity consistency and customer satisfaction.
+The primary goal is **maximizing facial identity consistency** and customer satisfaction. Every requirement below is subordinate to a measurable identity-consistency target (§3).
 
 ---
 
@@ -33,8 +48,8 @@ The primary goal is maximizing facial identity consistency and customer satisfac
 * Sell AI headshot packages
 * Support one-time purchases
 * Support future subscription plans
-* Enable repeat generations after initial training
-* Minimize AI generation costs
+* Enable repeat generations after initial training **without retraining** (persistent identity model — core, not future)
+* Keep AI cost per delivered headshot below a defined ceiling (§3, §31)
 
 ## User Goals
 
@@ -45,7 +60,39 @@ The primary goal is maximizing facial identity consistency and customer satisfac
 
 ---
 
-# 3. Tech Stack
+# 3. Success Criteria & KPIs
+
+The product is considered functional only when it meets these measurable targets. Default thresholds are starting points to be tuned during the validation spike.
+
+## Quality (the core)
+
+* **Identity similarity:** mean cosine similarity ≥ **0.65** (ArcFace/InsightFace embedding) between each delivered headshot and the user's input selfies.
+* **Identity gate pass rate:** ≥ **80%** of generated candidates pass the identity threshold (§16).
+* **Deliverable yield:** ≥ the package's promised headshot count survives gating after over-generation.
+* **Artifact rate:** ≤ **5%** of delivered images contain visible face artifacts (extra fingers, melted features, wrong eye count).
+
+## Funnel
+
+* Upload completion rate, checkout conversion, training success rate, generation success rate, download rate, repeat-generation rate (tracked per §32).
+
+## Economics
+
+* **Cost per delivered headshot** ≤ target ceiling (set during spike).
+* **Cost per order** = fixed training cost + (over-generation ratio × per-image inference cost) + upscaling. Must be defined and monitored (§31).
+
+---
+
+# 4. Non-Functional Requirements
+
+* **Latency:** training + first generation batch completes in p50 ≤ 30 min, p95 ≤ 60 min.
+* **Concurrency:** support N concurrent trainings and M concurrent generation jobs without queue starvation (capacity-plan via Inngest concurrency limits).
+* **Reliability:** every long-running step (validation, training, generation, ranking, upscaling) is **idempotent and retry-safe**.
+* **Reproducibility:** any delivered image can be regenerated from stored job params (model version, seed, template version, LoRA version) — see §33.
+* **Cost ceiling:** a hard per-order spend cap aborts and flags the order rather than overspending.
+
+---
+
+# 5. Tech Stack
 
 ## Frontend
 
@@ -88,7 +135,7 @@ The primary goal is maximizing facial identity consistency and customer satisfac
 
 ## AI Provider
 
-* Fal.ai
+* Fal.ai (primary). The pipeline must be **provider-abstracted** so an alternate provider (e.g. Replicate) can be swapped behind an interface for validation and redundancy.
 
 ## Hosting
 
@@ -96,7 +143,7 @@ The primary goal is maximizing facial identity consistency and customer satisfac
 
 ---
 
-# 4. Core User Flow
+# 6. Core User Flow
 
 ## Initial Flow
 
@@ -113,7 +160,7 @@ Landing Page
 
 ---
 
-# 5. User Roles
+# 7. User Roles
 
 ## Customer
 
@@ -138,26 +185,36 @@ Can:
 
 ---
 
-# 6. Packages
+# 8. Packages & Credit Model
 
-## Starter
+## Packages
+
+### Starter
 
 * 40 headshots
 * 10 styles
 
-## Professional
+### Professional
 
 * 120 headshots
 * 30 styles
 
-## Executive
+### Executive
 
 * 300 headshots
 * 50 styles
 
+## Credit Model
+
+* A purchase grants **credits**; **1 credit = 1 delivered headshot**.
+* Credits are tracked in a **credit ledger** (append-only) so balance is auditable: purchases add, deliveries subtract, refunds re-add.
+* The "headshots" count in a package equals the credits granted.
+* Over-generated candidates that fail gating do **not** consume credits — only delivered images do.
+* Packages are stored as a `Package` DB model (§27), not hardcoded, so pricing/contents can change without a deploy.
+
 ---
 
-# 7. Selfie Upload Requirements
+# 9. Selfie Upload Requirements
 
 Minimum:
 
@@ -181,11 +238,13 @@ Maximum size:
 
 * 15MB each
 
+Uploads use **signed URLs** directly to R2; the app never proxies raw image bytes.
+
 ---
 
-# 8. Photo Validation
+# 10. Photo Validation
 
-Every uploaded image must pass validation.
+Every uploaded image must pass validation before it can enter a dataset.
 
 ## Face Detection
 
@@ -202,15 +261,15 @@ Reject:
 
 Minimum:
 
-* 1024px
+* 1024px on the shorter edge
 
 ## Blur Detection
 
-Reject blurry images.
+Reject blurry images (variance-of-Laplacian below threshold).
 
 ## Similarity Detection
 
-Reject near-duplicate photos.
+Reject near-duplicate photos (perceptual hash / embedding distance below threshold) to avoid overfitting the dataset.
 
 ## Occlusion Detection
 
@@ -220,32 +279,72 @@ Reject:
 * Face masks
 * Heavy face obstruction
 
+## Output
+
+Each upload records a `validationStatus` and a machine-readable `validationReason` for rejected images, surfaced to the user.
+
 ---
 
-# 9. Identity Training
+# 11. Dataset Preparation
+
+The quality ceiling of the whole product is set here. "Dataset Creation" is not a black box.
+
+## Steps
+
+Validated Photos
+→ Face crop & center (consistent framing around the detected face)
+→ Angle/expression balancing (avoid a dataset of identical frontal shots)
+→ Auto-captioning (each image captioned with a consistent trigger + class word, e.g. `a photo of TOK man`)
+→ Resize/normalize to the trainer's expected resolution
+→ Package as training dataset (zip/manifest)
+
+## Requirements
+
+* Minimum **valid** images after preparation: 10 (ideal 15–25).
+* Captioning strategy (trigger word, class word, caption template) is **versioned config**, not hardcoded — it is the single highest-leverage lever on identity (§33).
+
+---
+
+# 12. Identity Training
 
 ## Purpose
 
-Create a personalized AI identity model.
+Create a personalized, **persistent** AI identity model the user can reuse for future generations without retraining.
 
 ## Flow
 
-Uploaded Photos
-→ Dataset Creation
-→ LoRA Training
+Prepared Dataset
+→ LoRA Training (on the configured base model)
+→ Identity self-check (validate the trained model reproduces the user's face)
 → Model Storage
 
 ## Output
 
-One LoRA model per user.
+* One **persistent** LoRA model per user, stored in R2.
+* Recorded with: `triggerWord`, `classWord`, `baseModel`, `baseModelVersion`, training params (steps, LR, rank), and `version`.
 
-Stored in R2.
+## Notes
+
+* The trigger word/class word chosen during dataset prep (§11) is what the prompts reference at generation time — **not** a literal substitution of the model into the prompt (see §14).
+* Retraining is explicit and re-versions the model; routine repeat generations reuse the existing model (margin engine).
 
 ---
 
-# 10. AI Templates
+# 13. AI Templates
 
-Templates define professional scenarios.
+A template is **not** just a prompt — it is a full, versioned generation recipe.
+
+## A template defines
+
+* Positive prompt (with `[TRIGGER]` / `[CLASS]` placeholders)
+* Negative prompt
+* LoRA strength / scale
+* Steps, guidance scale, sampler/scheduler
+* Base model + version
+* Target aspect ratio / resolution
+* Category
+
+Templates are versioned (§33); changing a template creates a new version so past results stay reproducible.
 
 ## Categories
 
@@ -285,69 +384,110 @@ Templates define professional scenarios.
 
 ---
 
-# 11. Prompt System
+# 14. Prompt System
 
-Templates are prompt collections.
+Templates are parameterized recipes (§13). At generation time:
 
-Example:
+1. The user's LoRA **weights are loaded** into the base model.
+2. The template's prompt is rendered, substituting the placeholders with the user's **trigger word** and **class word** (e.g. `TOK`, `man`).
 
-Professional corporate headshot of [PERSON],
+Example rendered prompt:
+
+```
+Professional corporate headshot of TOK man,
 business suit,
 modern office background,
 85mm lens,
 high-end photography,
 linkedin profile picture
+```
 
-[PERSON] is replaced by the user's LoRA.
+> Correction vs. 1.0: the LoRA is loaded as model weights; the prompt references the **trigger token** it was trained on. The model is never "substituted into" the prompt text.
 
 ---
 
-# 12. Generation Pipeline
+# 15. Generation Pipeline
 
 ## Workflow
 
 User Selects Templates
-→ Create Generation Job
+→ Create Generation Job (snapshot of template version + model version + seeds)
 → Queue
-→ Generate Variations
-→ Quality Ranking
-→ Upscale
+→ Generate **N candidates per delivered slot** (over-generation)
+→ Identity Gate + Quality Ranking (§16)
+→ Upscale survivors
 → Store Results
+
+## Over-Generation Ratio
+
+* Define `overgenFactor` (default **3–4×** per delivered headshot) as tunable config.
+* `overgenFactor` directly drives cost (§3, §31); it is monitored and adjusted to balance yield vs. spend.
+* Seeds, guidance, and LoRA strength may be varied across candidates to increase diversity and gate pass rate.
 
 ---
 
-# 13. Image Ranking
+# 16. Quality Gating & Ranking
 
-Generated images receive quality scores.
+Gating happens in two stages: a hard **gate** (pass/fail) then a soft **rank**.
 
-## Metrics
+## Stage 1 — Identity Gate (hard)
 
-* Face quality
-* Identity consistency
-* Sharpness
-* Eye quality
+* Compute face embedding of each candidate; reject any below the identity similarity threshold (§3).
+* This is the primary guarantee of the product's core promise. Candidates that fail are discarded and never delivered.
+
+## Stage 2 — Quality Ranking (soft)
+
+Surviving candidates are scored and the top ones (up to the credit/slot count) are delivered. Prioritized metrics:
+
+* **Identity consistency** (also used as the gate)
+* **Face/eye quality & artifact detection**
+* **Sharpness**
+
+Secondary / best-effort:
+
 * Prompt adherence
 * Aesthetic score
 
-Only top-ranked images are delivered.
+> Rationale: identity + face-quality/artifact filtering deliver the 80/20. The softer scores are added incrementally and must justify their cost before becoming gating criteria.
 
 ---
 
-# 14. Upscaling
+# 17. Upscaling
 
-Generated images should be upscaled before delivery.
+Delivered images are upscaled before delivery.
 
 Target:
 
 * 2048x2048
 
-Optional:
+Optional (paid tiers):
 
 * 4096x4096
 
 ---
 
-# 15. Dashboard
+# 18. Identity Method Strategy
+
+The platform should not hard-commit to a single identity approach. Two are evaluated and may be combined:
+
+## Trained LoRA (default, paid)
+
+* Highest identity fidelity.
+* Fixed training cost per user; cheap repeat generation thereafter (persistent model).
+
+## Instant / few-shot identity (optional)
+
+* IP-Adapter FaceID / InstantID / PuLID-style methods: 1–3 photos, no per-user training.
+* Lower fidelity, near-zero marginal cost, instant.
+
+## Hybrid recommendation
+
+* Use **instant** for free previews / fast low-cost paths and **trained LoRA** for paid delivery.
+* The validation spike must measure identity similarity and cost for **both** before locking the architecture.
+
+---
+
+# 19. Dashboard
 
 ## Navigation
 
@@ -365,27 +505,30 @@ Profile
 
 ---
 
-# 16. Order States
+# 20. Order States & Lifecycle
+
+## States
 
 PENDING_UPLOAD
-
 VALIDATING
-
 AWAITING_PAYMENT
-
 TRAINING
-
 GENERATING
-
 UPSCALING
-
 READY
-
 FAILED
+
+## Failure & Retry Semantics
+
+* Each state transition is logged with a timestamp and reason.
+* **FAILED** is entered when a step exhausts its retries or hits the per-order cost cap (§4).
+* A retry resumes from the **last successful step** (e.g. re-generate without re-training) to avoid paying the training cost again unless the model itself failed.
+* Refund policy: if an order cannot reach READY, undelivered credits are refunded to the ledger (§8) and the user is notified (§24).
+* All transitions are **idempotent** so duplicate job executions cannot double-charge credits or double-train.
 
 ---
 
-# 17. Gallery Features
+# 21. Gallery Features
 
 ## Actions
 
@@ -411,7 +554,7 @@ Package
 
 ---
 
-# 18. Favorites System
+# 22. Favorites System
 
 Users can bookmark generated images.
 
@@ -419,7 +562,7 @@ Favorites appear in a dedicated section.
 
 ---
 
-# 19. Billing
+# 23. Billing & Credits
 
 ## Paddle Checkout
 
@@ -428,7 +571,7 @@ Flow:
 Select Package
 → Paddle Checkout
 → Webhook
-→ Order Activation
+→ Credit Grant + Order Activation (§8)
 
 ## Required Webhooks
 
@@ -440,9 +583,14 @@ subscription.updated
 
 subscription.canceled
 
+## Correctness
+
+* Webhooks are **signature-verified** and **idempotent** (dedupe by event id) — replays must not double-grant credits.
+* Credit grants are written to the ledger (§8) inside the same transaction that activates the order.
+
 ---
 
-# 20. Email Notifications
+# 24. Email Notifications
 
 ## Events
 
@@ -456,25 +604,25 @@ Generation Started
 
 Headshots Ready
 
-Generation Failed
+Generation Failed (with refund/next-steps)
 
 ---
 
-# 21. Background Jobs
+# 25. Background Jobs
 
-Managed through Inngest.
+Managed through Inngest. Every job is **idempotent** (safe to re-run) and keyed so duplicate triggers are deduplicated.
 
 ## Jobs
 
 Photo Validation
 
-Dataset Creation
+Dataset Preparation
 
 LoRA Training
 
 Headshot Generation
 
-Image Ranking
+Quality Gating & Ranking
 
 Upscaling
 
@@ -484,7 +632,7 @@ Cleanup
 
 ---
 
-# 22. Storage Structure
+# 26. Storage Structure
 
 /uploads
 
@@ -498,9 +646,13 @@ Cleanup
 
 /thumbnails
 
+All access is via signed, time-limited URLs (§29).
+
 ---
 
-# 23. Database Models
+# 27. Database Models
+
+> Fields below are the concrete minimum; timestamps (`createdAt`/`updatedAt`) implied on all.
 
 ## User
 
@@ -508,13 +660,36 @@ Cleanup
 * email
 * name
 * image
+* role (CUSTOMER | ADMIN)
+
+## Package
+
+* id
+* name
+* priceCents
+* currency
+* credits (= headshots)
+* styleCount
+* active
 
 ## Order
 
 * id
 * userId
 * packageId
-* status
+* status (§20)
+* amountCents
+* currency
+* creditsGranted
+* paddleTransactionId
+
+## CreditLedgerEntry
+
+* id
+* userId
+* orderId
+* delta (+/-)
+* reason (PURCHASE | DELIVERY | REFUND)
 
 ## Upload
 
@@ -522,17 +697,26 @@ Cleanup
 * userId
 * fileUrl
 * validationStatus
+* validationReason
 
 ## Dataset
 
 * id
 * userId
+* imageCount
+* captionConfigVersion
 
 ## LoRAModel
 
 * id
 * userId
 * modelUrl
+* triggerWord
+* classWord
+* baseModel
+* baseModelVersion
+* trainingParams (json)
+* version
 * status
 
 ## Template
@@ -540,22 +724,41 @@ Cleanup
 * id
 * name
 * category
+* version
+* prompt
+* negativePrompt
+* loraStrength
+* steps
+* guidance
+* sampler
+* baseModel
+* aspectRatio
 
 ## GenerationJob
 
 * id
 * userId
 * templateId
+* templateVersion
+* loraModelId
 * status
 * progress
+* overgenFactor
+* seed
+* costCents
 
 ## GeneratedImage
 
 * id
 * jobId
+* templateId
 * imageUrl
 * thumbnailUrl
-* score
+* upscaledUrl
+* identitySimilarity
+* scores (json: sharpness, faceQuality, aesthetic, promptAdherence)
+* gatePassed
+* delivered
 
 ## Favorite
 
@@ -565,7 +768,7 @@ Cleanup
 
 ---
 
-# 24. Admin Panel
+# 28. Admin Panel
 
 ## Users
 
@@ -579,13 +782,13 @@ Suspend Account
 
 View Status
 
-Retry Failed Jobs
+Retry Failed Jobs (resumes from last successful step, §20)
 
 ## Templates
 
 Create
 
-Edit
+Edit (creates new version)
 
 Delete
 
@@ -605,20 +808,49 @@ Generation Queue
 
 Failures
 
+Per-job cost & identity-score review
+
 ---
 
-# 25. Security
+# 29. Security, Privacy & Compliance
+
+## Access & transport
 
 * Signed upload URLs
-* Protected downloads
+* Protected downloads (time-limited signed URLs)
 * Auth.js session validation
 * Rate limiting
-* Webhook signature validation
-* Secure file access
+* Webhook signature validation (§23)
+* Secure, scoped file access
+
+## Biometric data (faces are special-category data)
+
+* **Explicit consent** captured at upload for processing biometric data (GDPR Art. 9 / BIPA-style).
+* **Retention policy:** raw selfies and datasets auto-deleted after a defined window; user can delete on demand.
+* **Deletion SLA:** account/model deletion removes selfies, datasets, LoRA, and generated images within a defined SLA.
+* Per-user LoRA is **never** used to train shared/global models.
 
 ---
 
-# 26. Analytics
+# 30. Content Safety & Misuse Prevention
+
+* **Identity ownership consent:** user attests the uploaded face is their own (anti-impersonation / deepfake).
+* **Output safety filter:** NSFW/unsafe outputs are filtered before delivery.
+* **Abuse handling:** flagged accounts can be suspended; admin review queue for reported content.
+* **Bias awareness:** class-word selection and template tuning are validated across skin tones and genders to avoid known failure modes; track quality gate pass rate by cohort.
+
+---
+
+# 31. Observability & Cost Controls
+
+* Per-step and per-order **cost tracking** (training, inference × overgenFactor, upscaling).
+* **Hard per-order spend cap** (§4) that aborts and flags rather than overspending.
+* Dashboards/alerts for: identity gate pass rate, deliverable yield, cost per delivered headshot, queue depth, failure rate.
+* Structured logs linking every GeneratedImage back to its job params for reproducibility.
+
+---
+
+# 32. Analytics
 
 Track:
 
@@ -626,30 +858,28 @@ Track:
 * Checkout conversion
 * Training success rate
 * Generation success rate
+* Identity gate pass rate
 * Download rate
 * Repeat generation rate
+* Cost per delivered headshot
 
 ---
 
-# 27. Future Features
+# 33. Model & Config Versioning
 
-## AI Profile
+Reproducibility is a requirement (§4), so the following are versioned and stored with each job/result:
 
-Persistent identity model.
+* **Base model** + version (e.g. Flux variant)
+* **LoRA model** version per user
+* **Template** version (prompt + all params)
+* **Caption/trigger config** version (§11)
+* **Seed** per generated image
 
-Allows generating new headshots without retraining.
+Changing any of these creates a new version; historical results remain regenerable.
 
-## Team Packages
+---
 
-Multiple employees per order.
-
-## Custom Templates
-
-User-created styles.
-
-## Subscription Plans
-
-Monthly generations.
+# 34. Future Features
 
 ## AI Editing
 
@@ -662,3 +892,17 @@ Change expression
 Change lighting
 
 Without retraining.
+
+## Team Packages
+
+Multiple employees per order.
+
+## Custom Templates
+
+User-created styles.
+
+## Subscription Plans
+
+Monthly credit grants.
+
+> Note: the **persistent AI identity profile** (formerly a "future feature" in 1.0) is now core — see §12.
