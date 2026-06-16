@@ -1,26 +1,105 @@
 @import "tailwindcss";
 
+/*
+  APERTURE — AI Studio Headshots
+  Visual language extracted from the reference (aiheadui.png):
+  warm paper, near-black ink, one electric-blue accent, big bold
+  grotesque type, mono kicker labels, generous negative space.
+*/
+
+@theme {
+  /* Surfaces */
+  --color-paper: #e9e7df;
+  --color-paper-raised: #f1efe8;
+  --color-paper-sunken: #e1ded4;
+  --color-ink: #0c0c0d;
+  --color-ink-soft: #141416;
+  --color-ink-raised: #1c1c1f;
+
+  /* Accent */
+  --color-electric: #1e35ff;
+  --color-electric-bright: #3b51ff;
+  --color-electric-dim: #1224c9;
+
+  /* Text */
+  --color-muted: #6c6b63;
+  --color-muted-dark: #9c9b91;
+  --color-faint: #a3a298;
+
+  /* Lines */
+  --color-line: rgba(12, 12, 13, 0.12);
+  --color-line-strong: rgba(12, 12, 13, 0.24);
+  --color-line-invert: rgba(255, 255, 255, 0.12);
+
+  /* Type */
+  --font-sans: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  /* Radius */
+  --radius-card: 18px;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: var(--color-paper);
+  --foreground: var(--color-ink);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+* {
+  border-color: var(--color-line);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  /* faint paper grain for atmosphere */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+}
+
+::selection {
+  background: var(--color-electric);
+  color: #fff;
+}
+
+/* Reusable kicker / eyebrow label */
+.kicker {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+/* Tight display tracking for big headlines */
+.display {
+  letter-spacing: -0.035em;
+  line-height: 0.92;
+  font-weight: 800;
+}
+
+/* Marquee */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.animate-marquee {
+  animation: marquee 28s linear infinite;
+}
+
+/* Staggered hero reveal */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.rise {
+  opacity: 0;
+  animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee, .rise { animation: none; opacity: 1; }
 }
