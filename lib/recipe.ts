@@ -59,9 +59,10 @@ export const STYLES: Record<StyleKey, { label: string; prompt: string }> = {
   bw_dramatic: {
     label: "B&W Editorial",
     prompt:
-      `dramatic black and white portrait of ${TRIGGER}, a person, strong side ` +
-      "Rembrandt lighting with deep shadows, high contrast, moody, cinematic, " +
-      "film grain, looking into camera, photorealistic",
+      `dramatic black and white editorial portrait of ${TRIGGER}, a person, soft ` +
+      "key light with gentle Rembrandt shadow, balanced exposure, face clearly lit " +
+      "and visible, elegant high-key background, cinematic, subtle film grain, " +
+      "looking into camera, photorealistic",
   },
   outdoor: {
     label: "Outdoor",
