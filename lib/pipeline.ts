@@ -42,6 +42,16 @@ export interface UploadInput {
   type: string;
 }
 
+/**
+ * Public callback URL for Replicate webhooks. Set WEBHOOK_BASE_URL to a
+ * publicly reachable origin (a tunnel like cloudflared/ngrok in dev, the deploy
+ * URL in prod). When unset, we fall back to poll-driven advancement.
+ */
+function webhookUrl(orderId: string): string | undefined {
+  const base = process.env.WEBHOOK_BASE_URL?.replace(/\/$/, "");
+  return base ? `${base}/api/webhooks/replicate/${orderId}` : undefined;
+}
+
 /** Downscale a selfie to ≤1024px JPEG (reqs §11 dataset prep). */
 async function downscale(buf: Buffer): Promise<Buffer> {
   return sharp(buf)
@@ -67,10 +77,12 @@ export async function startOrder(files: UploadInput[], packId: string): Promise<
     refs.map((b, i) => uploadFile(b, `ref_${i}.jpg`, "image/jpeg")),
   );
 
-  const { id: trainingId, destination } = await startTraining(zipUrl);
+  // id is generated first so the training webhook can carry it
+  const id = newOrderId();
+  const { id: trainingId, destination } = await startTraining(zipUrl, webhookUrl(id));
 
   const order: Order = {
-    id: newOrderId(),
+    id,
     createdAt: Date.now(),
     status: "training",
     packId,
@@ -88,25 +100,34 @@ export async function startOrder(files: UploadInput[], packId: string): Promise<
 
 // serialize ticks per order within this process to avoid double-firing steps
 const advancing = new Set<string>();
+// a trigger (webhook/poll) that arrives mid-tick sets this so we re-run and
+// don't lose the wake-up (e.g. the last generation completing during a tick)
+const dirty = new Set<string>();
 
 export async function advanceOrder(order: Order): Promise<Order> {
   if (order.status === "ready" || order.status === "failed") return order;
-  if (advancing.has(order.id)) return order;
+  if (advancing.has(order.id)) {
+    dirty.add(order.id);
+    return order;
+  }
   advancing.add(order.id);
   try {
-    if (order.status === "training") await tickTraining(order);
-    else if (order.status === "generating") await tickGenerating(order);
-    else if (order.status === "gating") await tickGating(order);
-    saveOrder(order);
-    return order;
-  } catch (err) {
-    // Transient (network) errors must NOT kill the order — they're retried on
-    // the next poll. Genuine terminal failures are handled inside the ticks,
-    // which set status="failed" explicitly without throwing.
-    console.error(
-      `[order ${order.id}] tick error (will retry):`,
-      err instanceof Error ? err.message : err,
-    );
+    do {
+      dirty.delete(order.id);
+      try {
+        if (order.status === "training") await tickTraining(order);
+        else if (order.status === "generating") await tickGenerating(order);
+        else if (order.status === "gating") await tickGating(order);
+        saveOrder(order);
+      } catch (err) {
+        // Transient (network) errors must NOT kill the order — retried on the
+        // next trigger. Terminal failures are set inside ticks without throwing.
+        console.error(
+          `[order ${order.id}] tick error (will retry):`,
+          err instanceof Error ? err.message : err,
+        );
+      }
+    } while (dirty.has(order.id) && !["ready", "failed"].includes(order.status));
     return order;
   } finally {
     advancing.delete(order.id);
@@ -147,7 +168,13 @@ async function tickGenerating(order: Order): Promise<void> {
   // 1) create a prediction for any shot that doesn't have one yet
   for (const shot of order.shots) {
     if (shot.status !== "pending") continue;
-    const pred = await createGeneration(versionHash, STYLES[shot.style].prompt, shot.seed, GEN_BASE);
+    const pred = await createGeneration(
+      versionHash,
+      STYLES[shot.style].prompt,
+      shot.seed,
+      GEN_BASE,
+      webhookUrl(order.id),
+    );
     shot.id = pred.id;
     shot.status = pred.status;
     saveOrder(order); // persist immediately so a later failure doesn't re-create
@@ -177,7 +204,7 @@ async function tickGenerating(order: Order): Promise<void> {
   order.genSeconds = order.shots.reduce((a, s) => a + (s.predictTime ?? 0), 0);
   for (const shot of order.shots) {
     if (shot.status !== "succeeded" || !shot.url || shot.matchId) continue;
-    const match = await createFaceMatch(order.referenceUrls[0], shot.url);
+    const match = await createFaceMatch(order.referenceUrls[0], shot.url, webhookUrl(order.id));
     shot.matchId = match.id;
     saveOrder(order);
   }

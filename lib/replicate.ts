@@ -5,6 +5,7 @@
  * poll it on later ticks rather than holding the request open.
  */
 import { setDefaultResultOrder } from "node:dns";
+import { createHmac, timingSafeEqual } from "node:crypto";
 
 // WSL/undici often resolves AAAA (IPv6) first and the connection silently
 // fails ("fetch failed"). Prefer IPv4, like the Python client and MCP do.
@@ -118,8 +119,16 @@ export async function ensureModel(): Promise<string> {
   return full;
 }
 
+/** When set, Replicate POSTs here when the prediction/training completes. */
+function webhookFields(webhook?: string) {
+  return webhook ? { webhook, webhook_events_filter: ["completed"] } : {};
+}
+
 /** Start LoRA training from a zip URL. Returns the training id + destination. */
-export async function startTraining(zipUrl: string): Promise<{ id: string; destination: string }> {
+export async function startTraining(
+  zipUrl: string,
+  webhook?: string,
+): Promise<{ id: string; destination: string }> {
   const destination = await ensureModel();
   const r = await postJson(`/models/${TRAINER}/versions/${TRAINER_VERSION}/trainings`, {
     destination,
@@ -129,6 +138,7 @@ export async function startTraining(zipUrl: string): Promise<{ id: string; desti
       steps: TRAIN_STEPS,
       lora_rank: LORA_RANK,
     },
+    ...webhookFields(webhook),
   });
   if (!r.ok) throw new Error(`startTraining failed: ${r.status} ${await r.text()}`);
   const t = (await r.json()) as Training;
@@ -147,20 +157,27 @@ export async function createGeneration(
   prompt: string,
   seed: number,
   base: Record<string, unknown>,
+  webhook?: string,
 ): Promise<Prediction> {
   const r = await postJson("/predictions", {
     version: versionHash,
     input: { ...base, prompt, num_outputs: 1, seed },
+    ...webhookFields(webhook),
   });
   if (!r.ok) throw new Error(`createGeneration failed: ${r.status} ${await r.text()}`);
   return (await r.json()) as Prediction;
 }
 
 /** Create a face-similarity prediction (non-blocking). */
-export async function createFaceMatch(refUrl: string, outUrl: string): Promise<Prediction> {
+export async function createFaceMatch(
+  refUrl: string,
+  outUrl: string,
+  webhook?: string,
+): Promise<Prediction> {
   const r = await postJson("/predictions", {
     version: FACEMATCH_VERSION,
     input: { image1: refUrl, image2: outUrl },
+    ...webhookFields(webhook),
   });
   if (!r.ok) throw new Error(`createFaceMatch failed: ${r.status} ${await r.text()}`);
   return (await r.json()) as Prediction;
@@ -190,3 +207,38 @@ export function extractSimilarity(output: unknown): number | null {
 
 export const isTerminal = (s: string) =>
   s === "succeeded" || s === "failed" || s === "canceled";
+
+// --- webhook signature verification (Replicate uses svix-style signing) ---
+
+let cachedSecret: string | null | undefined; // undefined=unfetched, null=unavailable
+async function getWebhookSecret(): Promise<string | null> {
+  if (cachedSecret !== undefined) return cachedSecret;
+  try {
+    const r = await getJson("/webhooks/default/secret");
+    cachedSecret = r.ok ? (((await r.json()).key as string) ?? null) : null;
+  } catch {
+    cachedSecret = null;
+  }
+  return cachedSecret;
+}
+
+/**
+ * Verify a Replicate webhook came from Replicate (HMAC-SHA256 over
+ * `${id}.${timestamp}.${body}`, base64, matched against the webhook-signature
+ * header). Returns false if the secret can't be fetched or anything mismatches.
+ */
+export async function verifyWebhook(
+  h: { id: string | null; timestamp: string | null; signature: string | null },
+  body: string,
+): Promise<boolean> {
+  const secret = await getWebhookSecret();
+  if (!secret || !h.id || !h.timestamp || !h.signature) return false;
+  const key = Buffer.from(secret.replace(/^whsec_/, ""), "base64");
+  const expected = createHmac("sha256", key).update(`${h.id}.${h.timestamp}.${body}`).digest("base64");
+  const expectedBuf = Buffer.from(expected);
+  for (const part of h.signature.split(" ")) {
+    const sig = Buffer.from(part.includes(",") ? part.split(",")[1] : part);
+    if (sig.length === expectedBuf.length && timingSafeEqual(sig, expectedBuf)) return true;
+  }
+  return false;
+}
