@@ -2,11 +2,12 @@ import Link from "next/link";
 import { Topbar } from "@/app/dashboard/_components/topbar";
 import { StatusBadge } from "@/app/dashboard/_components/status-badge";
 import { orderRows } from "@/lib/view";
+import { requireUserId } from "@/lib/dal";
 
 export const dynamic = "force-dynamic"; // always read the live store
 
-export default function OrdersPage() {
-  const rows = orderRows();
+export default async function OrdersPage() {
+  const rows = orderRows(await requireUserId());
 
   return (
     <>

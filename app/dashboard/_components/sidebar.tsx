@@ -2,6 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { logout } from "@/app/actions/auth";
+
+function initials(name: string | null, email: string | null): string {
+  if (name?.trim()) {
+    const parts = name.trim().split(/\s+/);
+    return (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase();
+  }
+  return (email?.[0] ?? "?").toUpperCase();
+}
 
 const nav = [
   { href: "/dashboard", label: "Dashboard", icon: "grid" },
@@ -73,7 +82,11 @@ function Icon({ name }: { name: string }) {
   }
 }
 
-export function Sidebar() {
+export function Sidebar({
+  user,
+}: {
+  user: { name: string | null; email: string | null } | null;
+}) {
   const pathname = usePathname();
 
   return (
@@ -126,13 +139,26 @@ export function Sidebar() {
       </div>
 
       <div className="flex items-center gap-3 border-t border-line px-4 py-4">
-        <span className="grid h-9 w-9 place-items-center rounded-full bg-electric text-sm font-bold text-white">
-          IS
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-electric text-sm font-bold text-white">
+          {initials(user?.name ?? null, user?.email ?? null)}
         </span>
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold">Igor S.</p>
-          <p className="truncate text-xs text-muted">igoooorsrs@gmail.com</p>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold">{user?.name ?? "Account"}</p>
+          <p className="truncate text-xs text-muted">{user?.email ?? ""}</p>
         </div>
+        <form action={logout}>
+          <button
+            type="submit"
+            title="Sign out"
+            className="grid h-8 w-8 place-items-center rounded-lg text-muted transition-colors hover:bg-ink/5 hover:text-ink"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <path d="m16 17 5-5-5-5" />
+              <path d="M21 12H9" />
+            </svg>
+          </button>
+        </form>
       </div>
     </aside>
   );

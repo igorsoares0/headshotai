@@ -47,3 +47,6 @@ next-env.d.ts
 # product runtime data (orders + generated images)
 /.data
 /public/generated
+
+# generated Prisma client
+/lib/generated

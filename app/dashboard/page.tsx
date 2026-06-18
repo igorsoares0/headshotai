@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Topbar } from "@/app/dashboard/_components/topbar";
 import { StatusBadge } from "@/app/dashboard/_components/status-badge";
 import { activeOrder, dashboardStats, galleryShots } from "@/lib/view";
+import { requireUserId } from "@/lib/dal";
 
 export const dynamic = "force-dynamic";
 
@@ -13,10 +14,11 @@ const STAGE_LABEL: Record<(typeof STAGES)[number], string> = {
   ready: "Ready",
 };
 
-export default function DashboardHome() {
-  const stats = dashboardStats();
-  const active = activeOrder();
-  const recent = galleryShots().slice(0, 8);
+export default async function DashboardHome() {
+  const userId = await requireUserId();
+  const stats = dashboardStats(userId);
+  const active = activeOrder(userId);
+  const recent = galleryShots(userId).slice(0, 8);
 
   const summary = [
     { label: "Orders", value: String(stats.orders), hint: "all time" },

@@ -11,7 +11,8 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3055/dashboard/new)",
       "Bash(curl -s http://localhost:3055/api/orders)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3055/api/orders/nope)",
-      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3055/dashboard/orders/nope)"
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3055/dashboard/orders/nope)",
+      "WebSearch"
     ]
   },
   "enableAllProjectMcpServers": true,

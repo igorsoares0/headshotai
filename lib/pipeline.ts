@@ -62,7 +62,11 @@ async function downscale(buf: Buffer): Promise<Buffer> {
 }
 
 /** Create an order: preprocess selfies, upload, kick off LoRA training. */
-export async function startOrder(files: UploadInput[], packId: string): Promise<Order> {
+export async function startOrder(
+  files: UploadInput[],
+  packId: string,
+  userId: string,
+): Promise<Order> {
   const processed = await Promise.all(files.map((f) => downscale(f.buffer)));
 
   // build training zip
@@ -83,6 +87,7 @@ export async function startOrder(files: UploadInput[], packId: string): Promise<
 
   const order: Order = {
     id,
+    userId,
     createdAt: Date.now(),
     status: "training",
     packId,

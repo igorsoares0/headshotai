@@ -97,7 +97,7 @@ export default function Home() {
                 style={{ animationDelay: "240ms" }}
               >
                 <Link
-                  href="/dashboard"
+                  href="/signup"
                   className="rounded-full bg-ink px-6 py-3.5 text-sm font-semibold text-paper transition-colors hover:bg-ink-raised"
                 >
                   Create my headshots
@@ -310,7 +310,7 @@ export default function Home() {
                   </ul>
 
                   <Link
-                    href="/dashboard"
+                    href="/signup"
                     className={`mt-8 rounded-full px-5 py-3 text-center text-sm font-semibold transition-colors ${
                       p.featured
                         ? "bg-electric text-white hover:bg-electric-bright"

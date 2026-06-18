@@ -38,8 +38,8 @@ export interface OrderRow {
   total: number;
 }
 
-export function orderRows(): OrderRow[] {
-  return listOrders().map((o) => ({
+export function orderRows(userId: string): OrderRow[] {
+  return listOrders(userId).map((o) => ({
     id: o.id,
     pkgName: pkgName(o.packId),
     date: fmtDate(o.createdAt),
@@ -59,9 +59,9 @@ export interface GalleryShot {
   score: number; // 0-100
 }
 
-export function galleryShots(): GalleryShot[] {
+export function galleryShots(userId: string): GalleryShot[] {
   const out: GalleryShot[] = [];
-  for (const o of listOrders()) {
+  for (const o of listOrders(userId)) {
     for (const s of o.shots) {
       if (s.pass && s.file) {
         out.push({
@@ -78,8 +78,8 @@ export function galleryShots(): GalleryShot[] {
   return out;
 }
 
-export function dashboardStats() {
-  const orders = listOrders();
+export function dashboardStats(userId: string) {
+  const orders = listOrders(userId);
   const shots = orders.flatMap((o) => o.shots);
   return {
     orders: orders.length,
@@ -89,6 +89,6 @@ export function dashboardStats() {
   };
 }
 
-export function activeOrder(): Order | null {
-  return listOrders().find((o) => IN_PROGRESS.includes(o.status)) ?? null;
+export function activeOrder(userId: string): Order | null {
+  return listOrders(userId).find((o) => IN_PROGRESS.includes(o.status)) ?? null;
 }

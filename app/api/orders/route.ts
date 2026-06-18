@@ -1,14 +1,20 @@
 import type { NextRequest } from "next/server";
+import { auth } from "@/auth";
 import { startOrder, type UploadInput } from "@/lib/pipeline";
 import { listOrders } from "@/lib/store";
 
 export const runtime = "nodejs"; // needs fs + sharp
 
 export async function GET() {
-  return Response.json(listOrders());
+  const session = await auth();
+  if (!session?.user?.id) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  return Response.json(listOrders(session.user.id));
 }
 
 export async function POST(request: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.id) return Response.json({ error: "Unauthorized" }, { status: 401 });
+
   const form = await request.formData();
   const files = form.getAll("photos").filter((f): f is File => f instanceof File);
   const packId = (form.get("packId") as string) || "professional";
@@ -28,7 +34,7 @@ export async function POST(request: NextRequest) {
         type: f.type,
       })),
     );
-    const order = await startOrder(inputs, packId);
+    const order = await startOrder(inputs, packId, session.user.id);
     return Response.json({ id: order.id }, { status: 201 });
   } catch (e) {
     return Response.json(

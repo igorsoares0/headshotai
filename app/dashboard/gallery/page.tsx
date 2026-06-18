@@ -1,11 +1,12 @@
 import { Topbar } from "@/app/dashboard/_components/topbar";
 import { galleryShots } from "@/lib/view";
+import { requireUserId } from "@/lib/dal";
 import { GalleryClient } from "./gallery-client";
 
 export const dynamic = "force-dynamic";
 
-export default function GalleryPage() {
-  const shots = galleryShots();
+export default async function GalleryPage() {
+  const shots = galleryShots(await requireUserId());
   const categories = ["All", ...Array.from(new Set(shots.map((s) => s.styleLabel)))];
 
   return (

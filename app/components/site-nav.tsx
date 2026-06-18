@@ -32,13 +32,13 @@ export function SiteNav() {
 
         <div className="flex items-center gap-2">
           <Link
-            href="/dashboard"
+            href="/login"
             className="hidden rounded-full px-4 py-2 text-sm font-medium text-ink transition-colors hover:bg-ink/5 sm:block"
           >
             Sign in
           </Link>
           <Link
-            href="/dashboard"
+            href="/signup"
             className="rounded-full bg-electric px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-electric-dim"
           >
             Start now

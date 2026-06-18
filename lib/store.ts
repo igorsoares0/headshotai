@@ -25,6 +25,7 @@ export interface Shot {
 
 export interface Order {
   id: string;
+  userId: string; // owner (auth user id) — orders are scoped per user
   createdAt: number;
   status: OrderStatus;
   packId: string;
@@ -61,8 +62,10 @@ export function getOrder(id: string): Order | null {
   return readAll()[id] ?? null;
 }
 
-export function listOrders(): Order[] {
-  return Object.values(readAll()).sort((a, b) => b.createdAt - a.createdAt);
+export function listOrders(userId?: string): Order[] {
+  return Object.values(readAll())
+    .filter((o) => (userId ? o.userId === userId : true))
+    .sort((a, b) => b.createdAt - a.createdAt);
 }
 
 export function saveOrder(order: Order): void {

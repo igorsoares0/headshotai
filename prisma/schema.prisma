@@ -1,0 +1,20 @@
+// Prisma 7 (driver-adapter / "Rust-free"). The `prisma-client` generator with an
+// explicit output avoids the Turbopack ".prisma/client/default" resolution bug.
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+// Prisma 7 moved connection URLs out of the schema and into prisma.config.ts.
+// Runtime connection is supplied by the Neon driver adapter (see lib/prisma.ts).
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String?
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+}
