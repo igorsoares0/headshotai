@@ -16,16 +16,7 @@ export async function POST(request: Request) {
   let event;
   try {
     event = await paddle.webhooks.unmarshal(raw, PADDLE_WEBHOOK_SECRET, signature);
-  } catch (err) {
-    // TEMP diagnostics — remove once the webhook verifies.
-    console.error("[paddle webhook] signature check failed:", {
-      reason: err instanceof Error ? err.message : String(err),
-      hasSignatureHeader: signature.length > 0,
-      signaturePreview: signature.slice(0, 40),
-      secretIsSet: PADDLE_WEBHOOK_SECRET.length > 0,
-      secretPrefix: PADDLE_WEBHOOK_SECRET.slice(0, 11), // should be "pdl_ntfset_"
-      bodyLength: raw.length,
-    });
+  } catch {
     return new Response("invalid signature", { status: 401 });
   }
   if (!event) return new Response("invalid signature", { status: 401 });
