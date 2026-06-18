@@ -44,8 +44,8 @@ export interface OrderRow {
   total: number;
 }
 
-export function orderRows(userId: string): OrderRow[] {
-  return listOrders(userId).map((o) => ({
+export async function orderRows(userId: string): Promise<OrderRow[]> {
+  return (await listOrders(userId)).map((o) => ({
     id: o.id,
     pkgName: pkgName(o.packId),
     date: fmtDate(o.createdAt),
@@ -65,9 +65,9 @@ export interface GalleryShot {
   score: number; // 0-100
 }
 
-export function galleryShots(userId: string): GalleryShot[] {
+export async function galleryShots(userId: string): Promise<GalleryShot[]> {
   const out: GalleryShot[] = [];
-  for (const o of listOrders(userId)) {
+  for (const o of await listOrders(userId)) {
     for (const s of o.shots) {
       if (isDelivered(s) && s.file) {
         out.push({
@@ -84,8 +84,8 @@ export function galleryShots(userId: string): GalleryShot[] {
   return out;
 }
 
-export function dashboardStats(userId: string) {
-  const orders = listOrders(userId);
+export async function dashboardStats(userId: string) {
+  const orders = await listOrders(userId);
   const shots = orders.flatMap((o) => o.shots);
   return {
     orders: orders.length,
@@ -95,6 +95,6 @@ export function dashboardStats(userId: string) {
   };
 }
 
-export function activeOrder(userId: string): Order | null {
-  return listOrders(userId).find((o) => IN_PROGRESS.includes(o.status)) ?? null;
+export async function activeOrder(userId: string): Promise<Order | null> {
+  return (await listOrders(userId)).find((o) => IN_PROGRESS.includes(o.status)) ?? null;
 }

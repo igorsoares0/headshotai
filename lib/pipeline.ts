@@ -103,7 +103,7 @@ export async function startOrder(
     genSeconds: 0,
     shots: [],
   };
-  saveOrder(order);
+  await saveOrder(order);
   return order;
 }
 
@@ -127,7 +127,7 @@ export async function advanceOrder(order: Order): Promise<Order> {
         if (order.status === "training") await tickTraining(order);
         else if (order.status === "generating") await tickGenerating(order);
         else if (order.status === "gating") await tickGating(order);
-        saveOrder(order);
+        await saveOrder(order);
       } catch (err) {
         // Transient (network) errors must NOT kill the order — retried on the
         // next trigger. Terminal failures are set inside ticks without throwing.
@@ -197,7 +197,7 @@ async function tickGenerating(order: Order): Promise<void> {
     );
     shot.id = pred.id;
     shot.status = pred.status;
-    saveOrder(order); // persist immediately so a later failure doesn't re-create
+    await saveOrder(order); // persist immediately so a later failure doesn't re-create
   }
 
   // 2) poll in-flight predictions; download as each succeeds
@@ -212,7 +212,7 @@ async function tickGenerating(order: Order): Promise<void> {
       shot.predictTime = pred.metrics?.predict_time;
       shot.file = await downloadShot(order.id, `${shot.style}_${shot.idx}.jpg`, url);
       shot.status = "succeeded"; // only mark done after the file is on disk
-      saveOrder(order);
+      await saveOrder(order);
     } else {
       shot.status = pred.status;
     }
@@ -226,7 +226,7 @@ async function tickGenerating(order: Order): Promise<void> {
     if (shot.status !== "succeeded" || !shot.url || shot.matchId) continue;
     const match = await createFaceMatch(order.referenceUrls[0], shot.url, webhookUrl(order.id));
     shot.matchId = match.id;
-    saveOrder(order);
+    await saveOrder(order);
   }
   order.status = "gating";
 }

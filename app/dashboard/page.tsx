@@ -16,9 +16,9 @@ const STAGE_LABEL: Record<(typeof STAGES)[number], string> = {
 
 export default async function DashboardHome() {
   const userId = await requireUserId();
-  const stats = dashboardStats(userId);
-  const active = activeOrder(userId);
-  const recent = galleryShots(userId).slice(0, 8);
+  const stats = await dashboardStats(userId);
+  const active = await activeOrder(userId);
+  const recent = (await galleryShots(userId)).slice(0, 8);
 
   const summary = [
     { label: "Orders", value: String(stats.orders), hint: "all time" },

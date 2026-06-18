@@ -19,6 +19,30 @@ model User {
   createdAt    DateTime @default(now())
 }
 
+// A generation order. The per-image `shots` array, plus `styles`/`referenceUrls`,
+// are stored as JSON columns — they're always read/written together with the
+// order, never queried individually (option a: JSON over a relational Shot table).
+model Order {
+  id             String   @id // app-generated "ord_…"
+  userId         String
+  createdAt      DateTime @default(now())
+  status         String // training | generating | gating | ready | failed
+  packId         String
+  targetCount    Int
+  styles         Json
+  trainingId     String
+  destination    String
+  trainedVersion String?
+  referenceUrls  Json
+  photoCount     Int
+  trainSeconds   Float?
+  genSeconds     Float    @default(0)
+  shots          Json     @default("[]")
+  error          String?
+
+  @@index([userId])
+}
+
 // One-time Paddle purchase. A `completed`, unconsumed Purchase entitles the user
 // to start exactly one generation order (consumed when the order is created).
 model Purchase {

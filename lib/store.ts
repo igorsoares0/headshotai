@@ -1,10 +1,12 @@
 /**
- * Dead-simple JSON file store for orders. This is the MVP stand-in for the
- * database models in reqs §27 — enough to run the real flow end-to-end without
- * standing up Postgres yet. Single-process, single-user; swap for a DB later.
+ * Order persistence, backed by Postgres via Prisma (reqs §27). The per-image
+ * `shots` array, `styles` and `referenceUrls` live in JSON columns — they're
+ * always handled together with the order, never queried individually. The app's
+ * Order/Shot types are intentionally kept independent of Prisma's generated
+ * types and mapped at this boundary (e.g. createdAt stays epoch-ms).
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { Prisma } from "@/lib/generated/prisma/client";
+import { prisma } from "./prisma";
 import type { StyleKey } from "./recipe";
 
 export type OrderStatus = "training" | "generating" | "gating" | "ready" | "failed";
@@ -27,7 +29,7 @@ export interface Shot {
 export interface Order {
   id: string;
   userId: string; // owner (auth user id) — orders are scoped per user
-  createdAt: number;
+  createdAt: number; // epoch ms
   status: OrderStatus;
   packId: string;
   targetCount: number; // delivered photos promised by the pack
@@ -43,37 +45,71 @@ export interface Order {
   error?: string;
 }
 
-const DATA_DIR = join(process.cwd(), ".data");
-const FILE = join(DATA_DIR, "orders.json");
+// Row shape as returned by Prisma (Json columns come back as JsonValue).
+type OrderRow = Prisma.OrderGetPayload<object>;
 
-function readAll(): Record<string, Order> {
-  if (!existsSync(FILE)) return {};
-  try {
-    return JSON.parse(readFileSync(FILE, "utf8")) as Record<string, Order>;
-  } catch {
-    return {};
-  }
+function toOrder(row: OrderRow): Order {
+  return {
+    id: row.id,
+    userId: row.userId,
+    createdAt: row.createdAt.getTime(),
+    status: row.status as OrderStatus,
+    packId: row.packId,
+    targetCount: row.targetCount,
+    styles: row.styles as unknown as StyleKey[],
+    trainingId: row.trainingId,
+    destination: row.destination,
+    trainedVersion: row.trainedVersion ?? undefined,
+    referenceUrls: row.referenceUrls as unknown as string[],
+    photoCount: row.photoCount,
+    trainSeconds: row.trainSeconds ?? undefined,
+    genSeconds: row.genSeconds,
+    shots: row.shots as unknown as Shot[],
+    error: row.error ?? undefined,
+  };
 }
 
-function writeAll(orders: Record<string, Order>): void {
-  if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
-  writeFileSync(FILE, JSON.stringify(orders, null, 2));
+// Column values for create/update (everything except the id).
+function toRow(o: Order) {
+  return {
+    userId: o.userId,
+    createdAt: new Date(o.createdAt),
+    status: o.status,
+    packId: o.packId,
+    targetCount: o.targetCount,
+    styles: o.styles as unknown as Prisma.InputJsonValue,
+    trainingId: o.trainingId,
+    destination: o.destination,
+    trainedVersion: o.trainedVersion ?? null,
+    referenceUrls: o.referenceUrls as unknown as Prisma.InputJsonValue,
+    photoCount: o.photoCount,
+    trainSeconds: o.trainSeconds ?? null,
+    genSeconds: o.genSeconds,
+    shots: o.shots as unknown as Prisma.InputJsonValue,
+    error: o.error ?? null,
+  };
 }
 
-export function getOrder(id: string): Order | null {
-  return readAll()[id] ?? null;
+export async function getOrder(id: string): Promise<Order | null> {
+  const row = await prisma.order.findUnique({ where: { id } });
+  return row ? toOrder(row) : null;
 }
 
-export function listOrders(userId?: string): Order[] {
-  return Object.values(readAll())
-    .filter((o) => (userId ? o.userId === userId : true))
-    .sort((a, b) => b.createdAt - a.createdAt);
+export async function listOrders(userId?: string): Promise<Order[]> {
+  const rows = await prisma.order.findMany({
+    where: userId ? { userId } : undefined,
+    orderBy: { createdAt: "desc" },
+  });
+  return rows.map(toOrder);
 }
 
-export function saveOrder(order: Order): void {
-  const all = readAll();
-  all[order.id] = order;
-  writeAll(all);
+export async function saveOrder(order: Order): Promise<void> {
+  const data = toRow(order);
+  await prisma.order.upsert({
+    where: { id: order.id },
+    create: { id: order.id, ...data },
+    update: data,
+  });
 }
 
 export function newOrderId(): string {

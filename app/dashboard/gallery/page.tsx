@@ -6,7 +6,7 @@ import { GalleryClient } from "./gallery-client";
 export const dynamic = "force-dynamic";
 
 export default async function GalleryPage() {
-  const shots = galleryShots(await requireUserId());
+  const shots = await galleryShots(await requireUserId());
   const categories = ["All", ...Array.from(new Set(shots.map((s) => s.styleLabel)))];
 
   return (

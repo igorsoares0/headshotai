@@ -6,7 +6,7 @@ import { FavoritesClient } from "./favorites-client";
 export const dynamic = "force-dynamic";
 
 export default async function FavoritesPage() {
-  const shots = galleryShots(await requireUserId());
+  const shots = await galleryShots(await requireUserId());
   return (
     <>
       <Topbar title="Favorites" subtitle="Your bookmarked headshots" />

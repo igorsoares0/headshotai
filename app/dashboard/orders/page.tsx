@@ -7,7 +7,7 @@ import { requireUserId } from "@/lib/dal";
 export const dynamic = "force-dynamic"; // always read the live store
 
 export default async function OrdersPage() {
-  const rows = orderRows(await requireUserId());
+  const rows = await orderRows(await requireUserId());
 
   return (
     <>

@@ -24,7 +24,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ord
   );
   if (!valid) return new Response("invalid signature", { status: 401 });
 
-  const order = getOrder(orderId);
+  const order = await getOrder(orderId);
   if (!order) return new Response("order not found", { status: 404 });
 
   await advanceOrder(order);
