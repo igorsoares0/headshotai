@@ -18,3 +18,19 @@ model User {
   passwordHash String
   createdAt    DateTime @default(now())
 }
+
+// One-time Paddle purchase. A `completed`, unconsumed Purchase entitles the user
+// to start exactly one generation order (consumed when the order is created).
+model Purchase {
+  id          String   @id @default(cuid())
+  userId      String
+  packId      String // starter | pro | premium
+  photoCount  Int
+  priceId     String
+  status      String   @default("pending") // pending | completed | consumed
+  paddleTxnId String?  @unique // Paddle transaction id — dedupes webhook replays
+  orderId     String? // set when consumed by an order
+  createdAt   DateTime @default(now())
+
+  @@index([userId, status])
+}

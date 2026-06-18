@@ -20,7 +20,8 @@ export interface Shot {
   predictTime?: number;
   matchId?: string; // face-match prediction id
   similarity?: number | null; // resolved gate score
-  pass?: boolean;
+  pass?: boolean; // cleared the identity gate
+  delivered?: boolean; // selected (top-N by similarity) for delivery to the user
 }
 
 export interface Order {
@@ -29,6 +30,7 @@ export interface Order {
   createdAt: number;
   status: OrderStatus;
   packId: string;
+  targetCount: number; // delivered photos promised by the pack
   styles: StyleKey[];
   trainingId: string;
   destination: string;

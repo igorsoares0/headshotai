@@ -18,10 +18,12 @@ import JSZip from "jszip";
 import {
   GEN_BASE,
   GATE,
-  OVERGEN,
+  MAX_GEN_PER_ORDER,
   REFERENCE_COUNT,
   STYLES,
   STYLE_KEYS,
+  distribute,
+  initialGenCount,
   type StyleKey,
 } from "./recipe";
 import {
@@ -34,7 +36,7 @@ import {
   startTraining,
   uploadFile,
 } from "./replicate";
-import { type Order, type Shot, newOrderId, saveOrder } from "./store";
+import { type Order, newOrderId, saveOrder } from "./store";
 
 export interface UploadInput {
   buffer: Buffer;
@@ -66,6 +68,7 @@ export async function startOrder(
   files: UploadInput[],
   packId: string,
   userId: string,
+  targetCount: number,
 ): Promise<Order> {
   const processed = await Promise.all(files.map((f) => downscale(f.buffer)));
 
@@ -91,6 +94,7 @@ export async function startOrder(
     createdAt: Date.now(),
     status: "training",
     packId,
+    targetCount,
     styles: STYLE_KEYS,
     trainingId,
     destination,
@@ -157,14 +161,25 @@ async function tickTraining(order: Order): Promise<void> {
 
   // build the over-generation plan as pending shots (no predictions yet);
   // tickGenerating fires them idempotently so a blip never re-fires the batch
-  const plan: Shot[] = [];
-  for (const style of order.styles as StyleKey[]) {
-    for (let i = 0; i < OVERGEN; i++) {
-      plan.push({ id: "", style, idx: i, seed: Math.floor(Math.random() * 2 ** 31), status: "pending" });
+  order.shots = [];
+  addPendingShots(order, distribute(initialGenCount(order.targetCount)));
+  order.status = "generating";
+}
+
+/** Append `pending` shots per style, continuing each style's idx sequence. */
+function addPendingShots(order: Order, perStyle: Record<StyleKey, number>): void {
+  for (const style of STYLE_KEYS) {
+    const start = order.shots.filter((s) => s.style === style).length;
+    for (let i = 0; i < perStyle[style]; i++) {
+      order.shots.push({
+        id: "",
+        style,
+        idx: start + i,
+        seed: Math.floor(Math.random() * 2 ** 31),
+        status: "pending",
+      });
     }
   }
-  order.shots = plan;
-  order.status = "generating";
 }
 
 async function tickGenerating(order: Order): Promise<void> {
@@ -232,7 +247,30 @@ async function tickGating(order: Order): Promise<void> {
   }
 
   const pending = order.shots.some((s) => s.matchId && s.similarity === undefined);
-  if (!pending) order.status = "ready";
+  if (pending) return; // still gating
+
+  const passers = order.shots.filter((s) => s.pass && s.file);
+
+  // Under-delivered? Top up with another batch (bounded by the per-order cap)
+  // and loop back through generation. Spike pass rate is ~100%, so this rarely
+  // fires — it's a safety net to honor the pack's promised count.
+  if (passers.length < order.targetCount && order.shots.length < MAX_GEN_PER_ORDER) {
+    const deficit = order.targetCount - passers.length;
+    const room = MAX_GEN_PER_ORDER - order.shots.length;
+    const add = Math.min(Math.ceil(deficit * 1.4), room);
+    if (add > 0) {
+      addPendingShots(order, distribute(add));
+      order.status = "generating";
+      return;
+    }
+  }
+
+  // Rank survivors by identity similarity and deliver the top N (the pack count).
+  const ranked = [...passers].sort((a, b) => (b.similarity ?? 0) - (a.similarity ?? 0));
+  ranked.forEach((shot, i) => {
+    shot.delivered = i < order.targetCount;
+  });
+  order.status = "ready";
 }
 
 async function downloadShot(orderId: string, name: string, url: string): Promise<string> {

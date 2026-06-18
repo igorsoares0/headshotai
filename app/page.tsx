@@ -2,7 +2,8 @@ import Link from "next/link";
 import { SiteNav } from "@/app/components/site-nav";
 import { SiteFooter } from "@/app/components/site-footer";
 import { Portrait } from "@/app/components/portrait";
-import { packages, styleCategories, stats } from "@/lib/data";
+import { styleCategories, stats } from "@/lib/data";
+import { PACKS } from "@/lib/packs";
 
 const steps = [
   {
@@ -259,7 +260,7 @@ export default function Home() {
             </div>
 
             <div className="mt-14 grid gap-5 lg:grid-cols-3">
-              {packages.map((p) => (
+              {PACKS.map((p) => (
                 <div
                   key={p.id}
                   className={`flex flex-col rounded-card border p-7 ${

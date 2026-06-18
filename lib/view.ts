@@ -16,6 +16,12 @@ const STATUS_LABEL: Record<Order["status"], string> = {
 
 const IN_PROGRESS: Order["status"][] = ["training", "generating", "gating"];
 
+// A shot counts as delivered if it was selected (top-N) — falling back to the
+// gate result for orders created before per-pack delivery selection existed.
+function isDelivered(s: Order["shots"][number]): boolean {
+  return (s.delivered ?? s.pass) === true;
+}
+
 function pkgName(id: string): string {
   return id ? id.charAt(0).toUpperCase() + id.slice(1) : "—";
 }
@@ -45,7 +51,7 @@ export function orderRows(userId: string): OrderRow[] {
     date: fmtDate(o.createdAt),
     statusLabel: STATUS_LABEL[o.status],
     rawStatus: o.status,
-    delivered: o.shots.filter((s) => s.pass).length,
+    delivered: o.shots.filter(isDelivered).length,
     total: o.shots.length,
   }));
 }
@@ -63,7 +69,7 @@ export function galleryShots(userId: string): GalleryShot[] {
   const out: GalleryShot[] = [];
   for (const o of listOrders(userId)) {
     for (const s of o.shots) {
-      if (s.pass && s.file) {
+      if (isDelivered(s) && s.file) {
         out.push({
           id: `${o.id}_${s.style}_${s.idx}`,
           orderId: o.id,
@@ -83,7 +89,7 @@ export function dashboardStats(userId: string) {
   const shots = orders.flatMap((o) => o.shots);
   return {
     orders: orders.length,
-    delivered: shots.filter((s) => s.pass).length,
+    delivered: shots.filter(isDelivered).length,
     inProgress: orders.filter((o) => IN_PROGRESS.includes(o.status)).length,
     ready: orders.filter((o) => o.status === "ready").length,
   };

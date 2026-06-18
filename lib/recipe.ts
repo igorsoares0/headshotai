@@ -24,8 +24,29 @@ export const LORA_RANK = 16;
 
 // Quality gating (reqs §3 / §16)
 export const GATE = 0.65; // ArcFace similarity floor
-export const OVERGEN = 3; // images generated per style; gate trims down (§15)
 export const REFERENCE_COUNT = 2; // selfies each output is compared against (max wins)
+
+// Delivery-by-count (reqs §15/§16): a pack promises N delivered photos. We
+// over-generate by a small margin (the spike measured ~100% identity pass, so a
+// big 3-4× ratio would just burn money), gate on identity, then rank survivors
+// by similarity and deliver the top N. A top-up round tops the pool up if a
+// batch under-delivers, bounded by a hard per-order image cap (cost cap, §4).
+export const OVERGEN_MARGIN = 1.4;
+export const MAX_GEN_PER_ORDER = 140; // ceil(80 * 1.4) = 112, with headroom for top-up
+
+/** Total images to generate for an initial batch targeting `count` deliveries. */
+export function initialGenCount(count: number): number {
+  return Math.min(Math.ceil(count * OVERGEN_MARGIN), MAX_GEN_PER_ORDER);
+}
+
+/** Spread `total` images across the styles as evenly as possible. */
+export function distribute(total: number): Record<StyleKey, number> {
+  const base = Math.floor(total / STYLE_KEYS.length);
+  let rem = total - base * STYLE_KEYS.length;
+  const out = {} as Record<StyleKey, number>;
+  for (const k of STYLE_KEYS) out[k] = base + (rem-- > 0 ? 1 : 0);
+  return out;
+}
 
 // Shared generation params
 export const GEN_BASE = {

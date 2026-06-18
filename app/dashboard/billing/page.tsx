@@ -1,87 +1,83 @@
 import { Topbar } from "@/app/dashboard/_components/topbar";
-import { packages, orders } from "@/lib/data";
+import { requireUserId } from "@/lib/dal";
+import { prisma } from "@/lib/prisma";
+import { PACKS, packById } from "@/lib/packs";
+import { BillingClient } from "./billing-client";
 
-const invoices = orders
-  .filter((o) => o.status !== "FAILED")
-  .map((o) => ({
-    id: o.id,
-    date: o.date,
-    pkg: o.pkg,
-    amount: o.pkg === "Executive" ? 99 : o.pkg === "Professional" ? 49 : 29,
-  }));
+export const dynamic = "force-dynamic";
 
-export default function BillingPage() {
+const STATUS_LABEL: Record<string, string> = {
+  pending: "Pending",
+  completed: "Ready to use",
+  consumed: "Used",
+};
+
+function fmtDate(d: Date): string {
+  return d.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
+}
+
+export default async function BillingPage() {
+  const userId = await requireUserId();
+  const purchases = await prisma.purchase.findMany({
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+  });
+  const active = purchases.filter((p) => p.status === "completed").length;
+
   return (
     <>
-      <Topbar title="Billing" subtitle="Plans, top-ups and invoices" />
+      <Topbar title="Billing" subtitle="Buy a pack to generate headshots" />
 
       <div className="space-y-8 px-5 py-8 sm:px-8">
-        {/* current plan */}
         <div className="flex flex-wrap items-center justify-between gap-4 rounded-card border border-line bg-ink p-6 text-paper">
           <div>
-            <p className="kicker text-muted-dark">Current pack</p>
-            <p className="mt-1 text-2xl font-extrabold tracking-tight">Professional</p>
-            <p className="mt-1 text-sm text-muted-dark">82 of 120 credits remaining</p>
+            <p className="kicker text-muted-dark">Packs ready to use</p>
+            <p className="mt-1 text-2xl font-extrabold tracking-tight">{active}</p>
           </div>
-          <div className="w-full max-w-xs">
-            <div className="h-2 overflow-hidden rounded-full bg-ink-raised">
-              <div className="h-full w-[68%] rounded-full bg-electric" />
+          <p className="max-w-xs text-sm text-muted-dark">
+            Each pack is a one-time purchase that delivers one batch of headshots.
+          </p>
+        </div>
+
+        <div>
+          <h2 className="mb-4 font-bold tracking-tight">Choose a pack</h2>
+          <BillingClient packs={PACKS} />
+        </div>
+
+        {purchases.length > 0 ? (
+          <div>
+            <h2 className="mb-4 font-bold tracking-tight">Purchases</h2>
+            <div className="overflow-hidden rounded-card border border-line bg-paper-raised">
+              <ul className="divide-y divide-line">
+                {purchases.map((p) => (
+                  <li
+                    key={p.id}
+                    className="grid grid-cols-2 items-center gap-4 px-6 py-4 sm:grid-cols-4"
+                  >
+                    <span className="text-sm font-semibold">
+                      {packById(p.packId)?.name ?? p.packId}
+                    </span>
+                    <span className="text-sm text-muted">{fmtDate(p.createdAt)}</span>
+                    <span className="text-sm text-muted">{p.photoCount} photos</span>
+                    <span className="sm:text-right">
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                          p.status === "completed"
+                            ? "bg-electric/10 text-electric"
+                            : p.status === "consumed"
+                              ? "bg-ink/5 text-muted"
+                              : "bg-amber-500/10 text-amber-600"
+                        }`}
+                      >
+                        {STATUS_LABEL[p.status] ?? p.status}
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
-        </div>
-
-        {/* top-up packs */}
-        <div>
-          <h2 className="mb-4 font-bold tracking-tight">Add more credits</h2>
-          <div className="grid gap-4 lg:grid-cols-3">
-            {packages.map((p) => (
-              <div
-                key={p.id}
-                className={`flex items-center justify-between rounded-card border p-5 ${
-                  p.featured ? "border-electric bg-paper-raised" : "border-line bg-paper-raised"
-                }`}
-              >
-                <div>
-                  <p className="font-bold tracking-tight">{p.name}</p>
-                  <p className="text-sm text-muted">
-                    {p.headshots} headshots · {p.styles} styles
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-2xl font-extrabold tracking-tight">${p.price}</p>
-                  <button className="mt-1 rounded-full bg-electric px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-electric-dim">
-                    Buy
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* invoices */}
-        <div>
-          <h2 className="mb-4 font-bold tracking-tight">Invoices</h2>
-          <div className="overflow-hidden rounded-card border border-line bg-paper-raised">
-            <ul className="divide-y divide-line">
-              {invoices.map((inv) => (
-                <li
-                  key={inv.id}
-                  className="grid grid-cols-2 items-center gap-4 px-6 py-4 sm:grid-cols-4"
-                >
-                  <span className="font-mono text-sm">{inv.id}</span>
-                  <span className="text-sm text-muted">{inv.date}</span>
-                  <span className="text-sm">{inv.pkg}</span>
-                  <span className="flex items-center justify-between gap-3 sm:justify-end">
-                    <span className="font-semibold">${inv.amount}.00</span>
-                    <a href="#" className="text-sm font-medium text-electric hover:underline">
-                      PDF
-                    </a>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
+        ) : null}
       </div>
     </>
   );

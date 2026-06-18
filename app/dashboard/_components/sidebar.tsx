@@ -84,8 +84,10 @@ function Icon({ name }: { name: string }) {
 
 export function Sidebar({
   user,
+  activePack,
 }: {
   user: { name: string | null; email: string | null } | null;
+  activePack: string | null;
 }) {
   const pathname = usePathname();
 
@@ -121,20 +123,20 @@ export function Sidebar({
         })}
       </nav>
 
-      {/* credits */}
+      {/* entitlement */}
       <div className="m-3 rounded-card border border-line bg-paper p-4">
         <div className="flex items-center justify-between">
-          <p className="kicker text-muted">Credits</p>
-          <span className="text-sm font-bold">82</span>
+          <p className="kicker text-muted">Pack</p>
+          <span className="text-sm font-bold">{activePack ?? "None"}</span>
         </div>
-        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-paper-sunken">
-          <div className="h-full w-[68%] rounded-full bg-electric" />
-        </div>
+        <p className="mt-2 text-xs text-muted">
+          {activePack ? "Ready to generate a batch." : "Buy a pack to generate headshots."}
+        </p>
         <Link
-          href="/dashboard/billing"
+          href={activePack ? "/dashboard/new" : "/dashboard/billing"}
           className="mt-3 block rounded-full bg-electric px-3 py-2 text-center text-xs font-semibold text-white transition-colors hover:bg-electric-dim"
         >
-          Top up
+          {activePack ? "Generate" : "Buy a pack"}
         </Link>
       </div>
 
