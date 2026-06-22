@@ -52,13 +52,14 @@ export const AESTHETIC_WEIGHT = 0.35;
 // near-duplicate poses; we keep the higher-ranked one (reqs §16, dedupe).
 export const DEDUPE_HAMMING = 6;
 
-// Delivery-by-count (reqs §15/§16): a pack promises N delivered photos. We
-// over-generate by a small margin (the spike measured ~100% identity pass, so a
-// big 3-4× ratio would just burn money), gate on identity, then rank survivors
-// by similarity and deliver the top N. A top-up round tops the pool up if a
-// batch under-delivers, bounded by a hard per-order image cap (cost cap, §4).
-export const OVERGEN_MARGIN = 1.4;
-export const MAX_GEN_PER_ORDER = 140; // ceil(80 * 1.4) = 112, with headroom for top-up
+// Delivery-by-count (reqs §15/§16): a pack promises N delivered photos. Identity
+// pass is ~100% (the spike), so 1.4× would already cover throughput — but stage-2
+// curation (aesthetics + dedupe) needs a real pool to pick from, so we over-
+// generate 2× and deliver the best N. Generation is cheap (~1¢/image; training
+// dominates cost), so the extra pool is nearly free quality. A top-up round tops
+// the pool up if a batch under-delivers, bounded by a hard per-order cap (§4).
+export const OVERGEN_MARGIN = 2.0;
+export const MAX_GEN_PER_ORDER = 200; // ceil(80 * 2.0) = 160, with headroom for top-up
 
 /** Total images to generate for an initial batch targeting `count` deliveries. */
 export function initialGenCount(count: number): number {
@@ -149,19 +150,18 @@ export const STYLES: Record<StyleKey, Style> = {
   bw_dramatic: {
     label: "B&W Editorial",
     prompt: (s) =>
-      `dramatic black and white editorial portrait of ${TRIGGER}, a ${s}, soft ` +
-      "key light with gentle Rembrandt shadow, balanced exposure, face clearly lit " +
-      "and visible, elegant high-key background, cinematic, subtle film grain, " +
-      "looking into camera, photorealistic",
-    params: { guidance_scale: 2.6 },
+      `black and white professional studio portrait of ${TRIGGER}, a ${s} wearing ` +
+      "a dark shirt, soft even studio lighting, plain dark gray background, natural " +
+      "skin texture, sharp focus on the eyes, looking at camera, 85mm portrait, " +
+      "high detail, monochrome, photorealistic",
   },
   outdoor: {
     label: "Outdoor",
     prompt: (s) =>
-      `outdoor environmental portrait of ${TRIGGER}, a ${s} in a light linen ` +
-      "shirt, golden hour backlight, blurred city street background, candid " +
-      "natural expression, 35mm, photorealistic",
-    params: { guidance_scale: 3.4 },
+      `outdoor professional headshot of ${TRIGGER}, a ${s} wearing a smart casual ` +
+      "shirt, soft natural daylight on the face, softly blurred green park " +
+      "background, shallow depth of field, sharp focus on the eyes, looking at " +
+      "camera, 85mm portrait, photorealistic",
   },
 };
 
