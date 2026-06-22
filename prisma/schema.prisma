@@ -46,6 +46,7 @@ model Order {
   status         String // training | generating | gating | ready | failed
   packId         String
   targetCount    Int
+  subject        String? // prompt anchor, e.g. "Latino man" (reqs §12/§14)
   styles         Json
   trainingId     String
   destination    String

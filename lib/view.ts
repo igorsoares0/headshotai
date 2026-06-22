@@ -10,11 +10,19 @@ const STATUS_LABEL: Record<Order["status"], string> = {
   training: "TRAINING",
   generating: "GENERATING",
   gating: "REVIEWING",
+  scoring: "SELECTING",
+  upscaling: "UPSCALING",
   ready: "READY",
   failed: "FAILED",
 };
 
-const IN_PROGRESS: Order["status"][] = ["training", "generating", "gating"];
+const IN_PROGRESS: Order["status"][] = [
+  "training",
+  "generating",
+  "gating",
+  "scoring",
+  "upscaling",
+];
 
 // A shot counts as delivered if it was selected (top-N) — falling back to the
 // gate result for orders created before per-pack delivery selection existed.
@@ -73,7 +81,8 @@ export async function galleryShots(userId: string): Promise<GalleryShot[]> {
         out.push({
           id: `${o.id}_${s.style}_${s.idx}`,
           orderId: o.id,
-          file: s.file,
+          file: s.upscaledFile ?? s.file, // serve the 2K version when ready
+
           styleLabel: STYLES[s.style]?.label ?? s.style,
           styleKey: s.style,
           score: s.similarity != null ? Math.round(s.similarity * 100) : 0,

@@ -11,13 +11,17 @@ type Shot = {
   idx: number;
   status: string;
   file?: string;
+  upscaledFile?: string;
   similarity?: number | null;
+  aesthetic?: number | null;
   pass?: boolean;
+  nsfw?: boolean;
+  delivered?: boolean;
 };
 
 type Order = {
   id: string;
-  status: "training" | "generating" | "gating" | "ready" | "failed";
+  status: "training" | "generating" | "gating" | "scoring" | "upscaling" | "ready" | "failed";
   photoCount: number;
   styles: StyleKey[];
   trainSeconds?: number;
@@ -30,6 +34,8 @@ const STAGES: { key: Order["status"]; label: string; hint: string }[] = [
   { key: "training", label: "Training", hint: "Learning your face (~20-30 min)" },
   { key: "generating", label: "Generating", hint: "Creating your headshots" },
   { key: "gating", label: "Reviewing", hint: "Keeping only the ones that look like you" },
+  { key: "scoring", label: "Selecting", hint: "Scoring and picking your best shots" },
+  { key: "upscaling", label: "Enhancing", hint: "Upscaling to 2K and sharpening faces" },
   { key: "ready", label: "Ready", hint: "Your headshots are done" },
 ];
 
@@ -80,7 +86,11 @@ export function OrderView({ id }: { id: string }) {
   }
 
   const currentIdx = order ? STAGES.findIndex((s) => s.key === order.status) : 0;
-  const passed = order?.shots.filter((s) => s.pass) ?? [];
+  // Delivered = the top-N actually selected (upscaled). Headline these. Shots that
+  // cleared identity but weren't selected go to an "also passed" section; NSFW
+  // ones are never surfaced. Rejected = failed the identity gate.
+  const delivered = order?.shots.filter((s) => s.delivered) ?? [];
+  const alsoPassed = order?.shots.filter((s) => s.pass && !s.delivered && !s.nsfw) ?? [];
   const rejected =
     order?.shots.filter((s) => s.file && s.pass === false && s.similarity !== undefined) ?? [];
 
@@ -147,16 +157,30 @@ export function OrderView({ id }: { id: string }) {
               <div>
                 <p className="kicker text-muted">Delivered</p>
                 <h2 className="text-2xl font-extrabold tracking-tight">
-                  {passed.length} headshots that look like you
+                  {delivered.length} headshots that look like you
                 </h2>
               </div>
               <p className="text-xs text-muted">
-                {order.shots.length} generated · {passed.length} passed the ≥{GATE} identity gate ·
+                {order.shots.length} generated · top {delivered.length} selected & upscaled to 2K ·
                 est. ${(((order.trainSeconds ?? 0) + order.genSeconds) * H100_PER_SEC).toFixed(2)}
               </p>
             </div>
 
-            <Gallery shots={passed} showScore />
+            <Gallery shots={delivered} showScore />
+
+            {alsoPassed.length > 0 && (
+              <details className="rounded-card border border-line bg-paper-raised p-5">
+                <summary className="cursor-pointer text-sm font-semibold text-muted">
+                  {alsoPassed.length} more passed the identity gate (not in your top {delivered.length})
+                </summary>
+                <p className="mt-2 text-xs text-muted">
+                  These look like you too, but ranked below your selected set on quality.
+                </p>
+                <div className="mt-4">
+                  <Gallery shots={alsoPassed} showScore />
+                </div>
+              </details>
+            )}
 
             {rejected.length > 0 && (
               <details className="rounded-card border border-line bg-paper-raised p-5">
@@ -175,13 +199,16 @@ export function OrderView({ id }: { id: string }) {
           </>
         )}
 
-        {/* live preview of generated shots while still gating */}
-        {order && (order.status === "generating" || order.status === "gating") && (
-          <div>
-            <p className="kicker mb-3 text-muted">Coming through…</p>
-            <Gallery shots={order.shots.filter((s) => s.file)} />
-          </div>
-        )}
+        {/* live preview of generated shots while still gating/selecting */}
+        {order &&
+          (order.status === "generating" ||
+            order.status === "gating" ||
+            order.status === "scoring") && (
+            <div>
+              <p className="kicker mb-3 text-muted">Coming through…</p>
+              <Gallery shots={order.shots.filter((s) => s.file)} />
+            </div>
+          )}
       </div>
     </>
   );
@@ -198,6 +225,16 @@ function ProgressLine({ order }: { order: Order }) {
     const total = order.shots.filter((s) => s.file).length;
     return <>Checking identity on {scored} of {total} images…</>;
   }
+  if (order.status === "scoring") {
+    const passers = order.shots.filter((s) => s.pass && s.file);
+    const done = passers.filter((s) => s.aesthetic !== undefined && s.nsfw !== undefined).length;
+    return <>Scoring quality on {done} of {passers.length} matches…</>;
+  }
+  if (order.status === "upscaling") {
+    const delivered = order.shots.filter((s) => s.delivered);
+    const done = delivered.filter((s) => s.upscaledFile).length;
+    return <>Upscaling {done} of {delivered.length} headshots to 2K…</>;
+  }
   return null;
 }
 
@@ -212,7 +249,7 @@ function Gallery({ shots, showScore, dim }: { shots: Shot[]; showScore?: boolean
           <div className="relative aspect-[4/5] bg-paper-sunken">
             {s.file ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={s.file} alt={STYLES[s.style]?.label ?? s.style} className="h-full w-full object-cover" />
+              <img src={s.upscaledFile ?? s.file} alt={STYLES[s.style]?.label ?? s.style} className="h-full w-full object-cover" />
             ) : (
               <div className="grid h-full w-full place-items-center text-xs text-muted">…</div>
             )}

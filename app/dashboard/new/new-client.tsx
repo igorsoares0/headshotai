@@ -4,11 +4,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Topbar } from "@/app/dashboard/_components/topbar";
+import { GENDERS, ETHNICITIES } from "@/lib/recipe";
 
 export function NewClient({ pack }: { pack: { name: string; photoCount: number } }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<File[]>([]);
+  const [gender, setGender] = useState("");
+  const [ethnicity, setEthnicity] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,6 +34,8 @@ export function NewClient({ pack }: { pack: { name: string; photoCount: number }
     try {
       const fd = new FormData();
       files.forEach((f) => fd.append("photos", f));
+      fd.append("gender", gender);
+      fd.append("ethnicity", ethnicity);
       const res = await fetch("/api/orders", { method: "POST", body: fd });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Something went wrong");
@@ -118,6 +123,48 @@ export function NewClient({ pack }: { pack: { name: string; photoCount: number }
               ))}
             </ul>
           </div>
+
+          {/* subject — anchors gender/ethnicity in the prompt so the model
+              keeps your identity instead of drifting */}
+          <div className="rounded-card border border-line bg-paper-raised p-6">
+            <h2 className="font-bold tracking-tight">Who are these photos of?</h2>
+            <p className="mt-1 text-xs text-muted">
+              Helps the model keep your gender and features consistent.
+            </p>
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <label className="block">
+                <span className="kicker text-muted">Gender</span>
+                <select
+                  value={gender}
+                  onChange={(e) => setGender(e.target.value)}
+                  className="mt-1.5 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-sm focus:border-electric focus:outline-none"
+                >
+                  <option value="" disabled>
+                    Select…
+                  </option>
+                  {GENDERS.map((g) => (
+                    <option key={g.value} value={g.value}>
+                      {g.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="kicker text-muted">Ethnicity (optional)</span>
+                <select
+                  value={ethnicity}
+                  onChange={(e) => setEthnicity(e.target.value)}
+                  className="mt-1.5 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-sm focus:border-electric focus:outline-none"
+                >
+                  {ETHNICITIES.map((x) => (
+                    <option key={x.value} value={x.value}>
+                      {x.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </div>
         </div>
 
         {/* pack summary + submit */}
@@ -141,7 +188,7 @@ export function NewClient({ pack }: { pack: { name: string; photoCount: number }
           )}
 
           <button
-            disabled={files.length < 10 || submitting}
+            disabled={files.length < 10 || !gender || submitting}
             onClick={submit}
             className="w-full rounded-full bg-electric px-5 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-electric-dim disabled:cursor-not-allowed disabled:opacity-40"
           >
@@ -149,7 +196,9 @@ export function NewClient({ pack }: { pack: { name: string; photoCount: number }
               ? "Starting…"
               : files.length < 10
                 ? `Add ${10 - files.length} more photos`
-                : "Start training →"}
+                : !gender
+                  ? "Select who these photos are of"
+                  : "Start training →"}
           </button>
           <Link href="/dashboard" className="block text-center text-sm font-medium text-muted hover:text-ink">
             Cancel

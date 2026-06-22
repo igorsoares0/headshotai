@@ -9,7 +9,14 @@ import { Prisma } from "@/lib/generated/prisma/client";
 import { prisma } from "./prisma";
 import type { StyleKey } from "./recipe";
 
-export type OrderStatus = "training" | "generating" | "gating" | "ready" | "failed";
+export type OrderStatus =
+  | "training"
+  | "generating"
+  | "gating"
+  | "scoring"
+  | "upscaling"
+  | "ready"
+  | "failed";
 
 export interface Shot {
   id: string; // generation prediction id
@@ -20,10 +27,18 @@ export interface Shot {
   url?: string; // replicate output url (expires)
   file?: string; // local path served under /generated/<orderId>/
   predictTime?: number;
-  matchId?: string; // face-match prediction id
-  similarity?: number | null; // resolved gate score
+  matchIds?: string[]; // face-match prediction ids, one per reference (max wins)
+  similarity?: number | null; // resolved gate score (best across references)
   pass?: boolean; // cleared the identity gate
-  delivered?: boolean; // selected (top-N by similarity) for delivery to the user
+  aestheticId?: string; // aesthetic-score prediction id
+  aesthetic?: number | null; // 1-10 aesthetic score (null = scoring failed)
+  safetyId?: string; // nsfw-classifier prediction id
+  nsfw?: boolean; // flagged unsafe → excluded from delivery
+  phash?: string; // 64-char average-hash bit string for near-duplicate detection
+  delivered?: boolean; // selected (top-N by combined score) for delivery to the user
+  upscaleId?: string; // upscale prediction id (delivered shots only)
+  upscaledUrl?: string; // replicate upscaled output url (expires)
+  upscaledFile?: string; // local path to the 2K file; falls back to `file` on failure
 }
 
 export interface Order {
@@ -33,6 +48,7 @@ export interface Order {
   status: OrderStatus;
   packId: string;
   targetCount: number; // delivered photos promised by the pack
+  subject?: string; // prompt anchor, e.g. "Latino man" (reqs §12/§14); legacy orders: undefined
   styles: StyleKey[];
   trainingId: string;
   destination: string;
@@ -56,6 +72,7 @@ function toOrder(row: OrderRow): Order {
     status: row.status as OrderStatus,
     packId: row.packId,
     targetCount: row.targetCount,
+    subject: row.subject ?? undefined,
     styles: row.styles as unknown as StyleKey[],
     trainingId: row.trainingId,
     destination: row.destination,
@@ -77,6 +94,7 @@ function toRow(o: Order) {
     status: o.status,
     packId: o.packId,
     targetCount: o.targetCount,
+    subject: o.subject ?? null,
     styles: o.styles as unknown as Prisma.InputJsonValue,
     trainingId: o.trainingId,
     destination: o.destination,

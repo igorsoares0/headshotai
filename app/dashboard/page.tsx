@@ -6,11 +6,13 @@ import { requireUserId } from "@/lib/dal";
 
 export const dynamic = "force-dynamic";
 
-const STAGES = ["training", "generating", "gating", "ready"] as const;
+const STAGES = ["training", "generating", "gating", "scoring", "upscaling", "ready"] as const;
 const STAGE_LABEL: Record<(typeof STAGES)[number], string> = {
   training: "Training",
   generating: "Generating",
   gating: "Reviewing",
+  scoring: "Selecting",
+  upscaling: "Enhancing",
   ready: "Ready",
 };
 

@@ -18,6 +18,10 @@ import {
   TRAINER,
   TRAINER_VERSION,
   FACEMATCH_VERSION,
+  UPSCALER_VERSION,
+  UPSCALE_SCALE,
+  AESTHETIC_VERSION,
+  NSFW_VERSION,
   MODEL_OWNER,
   MODEL_NAME,
   TRIGGER,
@@ -180,6 +184,39 @@ export async function createFaceMatch(
     ...webhookFields(webhook),
   });
   if (!r.ok) throw new Error(`createFaceMatch failed: ${r.status} ${await r.text()}`);
+  return (await r.json()) as Prediction;
+}
+
+/** Create an upscale + face-restoration prediction (non-blocking). */
+export async function createUpscale(imageUrl: string, webhook?: string): Promise<Prediction> {
+  const r = await postJson("/predictions", {
+    version: UPSCALER_VERSION,
+    input: { image: imageUrl, scale: UPSCALE_SCALE, face_enhance: true },
+    ...webhookFields(webhook),
+  });
+  if (!r.ok) throw new Error(`createUpscale failed: ${r.status} ${await r.text()}`);
+  return (await r.json()) as Prediction;
+}
+
+/** Create an aesthetic-score prediction (non-blocking). Output is a 1-10 number. */
+export async function createAesthetic(imageUrl: string, webhook?: string): Promise<Prediction> {
+  const r = await postJson("/predictions", {
+    version: AESTHETIC_VERSION,
+    input: { image: imageUrl },
+    ...webhookFields(webhook),
+  });
+  if (!r.ok) throw new Error(`createAesthetic failed: ${r.status} ${await r.text()}`);
+  return (await r.json()) as Prediction;
+}
+
+/** Create an NSFW-classification prediction (non-blocking). Output is a class string. */
+export async function createNsfw(imageUrl: string, webhook?: string): Promise<Prediction> {
+  const r = await postJson("/predictions", {
+    version: NSFW_VERSION,
+    input: { image: imageUrl },
+    ...webhookFields(webhook),
+  });
+  if (!r.ok) throw new Error(`createNsfw failed: ${r.status} ${await r.text()}`);
   return (await r.json()) as Prediction;
 }
 

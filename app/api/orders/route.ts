@@ -2,6 +2,8 @@ import type { NextRequest } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { startOrder, type UploadInput } from "@/lib/pipeline";
+import { describeSubject, GENDERS } from "@/lib/recipe";
+import { summarizeRejections, validateSelfies } from "@/lib/validate";
 import { listOrders } from "@/lib/store";
 import {
   consumePurchase,
@@ -48,6 +50,35 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "Upload at most 25 photos." }, { status: 400 });
   }
 
+  // Subject descriptor anchors gender/ethnicity in the prompt (reqs §12/§14) so
+  // FLUX doesn't drift. Gender is required; ethnicity is optional.
+  const gender = String(form.get("gender") ?? "");
+  if (!GENDERS.some((g) => g.value === gender)) {
+    return Response.json({ error: "Select who these photos are of." }, { status: 400 });
+  }
+  const subject = describeSubject(gender, String(form.get("ethnicity") ?? ""));
+
+  // Validate selfies BEFORE consuming the pack — a bad upload shouldn't cost a
+  // training run (reqs §9/§10). We train only on the photos that pass.
+  const inputs: UploadInput[] = await Promise.all(
+    files.map(async (f) => ({
+      buffer: Buffer.from(await f.arrayBuffer()),
+      name: f.name,
+      type: f.type,
+    })),
+  );
+  const { checks, validCount } = await validateSelfies(inputs);
+  if (validCount < 10) {
+    const why = summarizeRejections(checks);
+    return Response.json(
+      {
+        error: `Only ${validCount} of ${inputs.length} photos are usable${why ? ` (${why})` : ""}. Add at least 10 clear, well-lit photos.`,
+      },
+      { status: 400 },
+    );
+  }
+  const usable = inputs.filter((_, i) => checks[i].ok);
+
   // Reserve the purchase before doing any (paid) work so concurrent requests
   // can't spend it twice. Released back to the user if creation fails.
   const reserved = await consumePurchase(purchase.id);
@@ -56,14 +87,13 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const inputs: UploadInput[] = await Promise.all(
-      files.map(async (f) => ({
-        buffer: Buffer.from(await f.arrayBuffer()),
-        name: f.name,
-        type: f.type,
-      })),
+    const order = await startOrder(
+      usable,
+      purchase.packId,
+      session.user.id,
+      purchase.photoCount,
+      subject,
     );
-    const order = await startOrder(inputs, purchase.packId, session.user.id, purchase.photoCount);
     await linkPurchaseOrder(purchase.id, order.id);
     return Response.json({ id: order.id }, { status: 201 });
   } catch (e) {
