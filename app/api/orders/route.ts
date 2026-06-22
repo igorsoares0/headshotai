@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
 import { startOrder, type UploadInput } from "@/lib/pipeline";
 import { listOrders } from "@/lib/store";
 import {
@@ -20,6 +21,16 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return Response.json({ error: "Unauthorized" }, { status: 401 });
+
+  // Gate the paid action on a confirmed email — unverified accounts can sign in
+  // and browse, but can't spend a pack.
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { emailVerified: true },
+  });
+  if (!user?.emailVerified) {
+    return Response.json({ error: "Verify your email to start generating." }, { status: 403 });
+  }
 
   // Pay-first: a paid, unconsumed purchase is required to start a batch (§8).
   const purchase = await getActivePurchase(session.user.id);

@@ -16,6 +16,18 @@ export const LoginFormSchema = z.object({
   password: z.string().min(1, { error: "Password is required." }),
 });
 
+export const ForgotFormSchema = z.object({
+  email: z.email({ error: "Please enter a valid email." }).trim().toLowerCase(),
+});
+
+export const ResetFormSchema = z.object({
+  token: z.string().min(1),
+  password: z
+    .string()
+    .min(8, { error: "Password must be at least 8 characters." })
+    .trim(),
+});
+
 export type FormState =
   | {
       errors?: { name?: string[]; email?: string[]; password?: string[] };
