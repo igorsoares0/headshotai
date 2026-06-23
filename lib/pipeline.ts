@@ -23,10 +23,8 @@ import {
   MAX_GEN_PER_ORDER,
   REFERENCE_COUNT,
   STYLES,
-  STYLE_KEYS,
   distribute,
   initialGenCount,
-  type StyleKey,
 } from "./recipe";
 import {
   createAesthetic,
@@ -75,6 +73,7 @@ export async function startOrder(
   userId: string,
   targetCount: number,
   subject: string,
+  styles: string[],
 ): Promise<Order> {
   const processed = await Promise.all(files.map((f) => downscale(f.buffer)));
 
@@ -102,7 +101,7 @@ export async function startOrder(
     packId,
     targetCount,
     subject,
-    styles: STYLE_KEYS,
+    styles,
     trainingId,
     destination,
     referenceUrls,
@@ -171,13 +170,13 @@ async function tickTraining(order: Order): Promise<void> {
   // build the over-generation plan as pending shots (no predictions yet);
   // tickGenerating fires them idempotently so a blip never re-fires the batch
   order.shots = [];
-  addPendingShots(order, distribute(initialGenCount(order.targetCount)));
+  addPendingShots(order, distribute(initialGenCount(order.targetCount), order.styles));
   order.status = "generating";
 }
 
 /** Append `pending` shots per style, continuing each style's idx sequence. */
-function addPendingShots(order: Order, perStyle: Record<StyleKey, number>): void {
-  for (const style of STYLE_KEYS) {
+function addPendingShots(order: Order, perStyle: Record<string, number>): void {
+  for (const style of order.styles) {
     const start = order.shots.filter((s) => s.style === style).length;
     for (let i = 0; i < perStyle[style]; i++) {
       order.shots.push({
@@ -278,7 +277,7 @@ async function tickGating(order: Order): Promise<void> {
     const room = MAX_GEN_PER_ORDER - order.shots.length;
     const add = Math.min(Math.ceil(deficit * 1.4), room);
     if (add > 0) {
-      addPendingShots(order, distribute(add));
+      addPendingShots(order, distribute(add, order.styles));
       order.status = "generating";
       return;
     }

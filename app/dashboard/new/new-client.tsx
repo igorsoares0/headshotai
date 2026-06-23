@@ -4,7 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Topbar } from "@/app/dashboard/_components/topbar";
-import { GENDERS, ETHNICITIES } from "@/lib/recipe";
+import { GENDERS, ETHNICITIES, STYLES, STYLE_KEYS, MAX_LOOKS } from "@/lib/recipe";
+
+// A varied default selection so the user isn't forced to pick before starting.
+const DEFAULT_LOOKS = ["gray_navysuit", "white_blazer", "office_shirt", "park_shirt"].filter((k) =>
+  STYLE_KEYS.includes(k),
+);
 
 export function NewClient({ pack }: { pack: { name: string; photoCount: number } }) {
   const router = useRouter();
@@ -12,8 +17,19 @@ export function NewClient({ pack }: { pack: { name: string; photoCount: number }
   const [files, setFiles] = useState<File[]>([]);
   const [gender, setGender] = useState("");
   const [ethnicity, setEthnicity] = useState("");
+  const [looks, setLooks] = useState<string[]>(DEFAULT_LOOKS);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  function toggleLook(key: string) {
+    setLooks((prev) =>
+      prev.includes(key)
+        ? prev.filter((k) => k !== key)
+        : prev.length < MAX_LOOKS
+          ? [...prev, key]
+          : prev, // at the cap — ignore until one is removed
+    );
+  }
 
   const previews = useMemo(
     () => files.map((f) => ({ key: f.name + f.size, url: URL.createObjectURL(f) })),
@@ -36,6 +52,7 @@ export function NewClient({ pack }: { pack: { name: string; photoCount: number }
       files.forEach((f) => fd.append("photos", f));
       fd.append("gender", gender);
       fd.append("ethnicity", ethnicity);
+      looks.forEach((k) => fd.append("looks", k));
       const res = await fetch("/api/orders", { method: "POST", body: fd });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Something went wrong");
@@ -165,6 +182,41 @@ export function NewClient({ pack }: { pack: { name: string; photoCount: number }
               </label>
             </div>
           </div>
+
+          {/* looks — the user picks which styles to generate; overgen is split
+              across these, so fewer picks = more shots per look */}
+          <div className="rounded-card border border-line bg-paper-raised p-6">
+            <div className="flex items-center justify-between">
+              <h2 className="font-bold tracking-tight">Pick your looks</h2>
+              <span className="kicker text-muted">
+                {looks.length}/{MAX_LOOKS} selected
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-muted">Choose up to {MAX_LOOKS}. Outfit · background.</p>
+            <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {STYLE_KEYS.map((key) => {
+                const on = looks.includes(key);
+                const atCap = looks.length >= MAX_LOOKS;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => toggleLook(key)}
+                    disabled={!on && atCap}
+                    className={`rounded-xl border px-3 py-2.5 text-left text-xs font-medium transition-colors ${
+                      on
+                        ? "border-electric bg-electric/5 text-ink"
+                        : atCap
+                          ? "cursor-not-allowed border-line bg-paper text-muted/50"
+                          : "border-line bg-paper text-muted hover:border-electric hover:text-ink"
+                    }`}
+                  >
+                    {STYLES[key].label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
         {/* pack summary + submit */}
@@ -174,7 +226,9 @@ export function NewClient({ pack }: { pack: { name: string; photoCount: number }
             <div className="mt-4 flex items-center justify-between rounded-xl border border-electric bg-electric/5 p-4">
               <span>
                 <span className="block text-sm font-semibold">{pack.name}</span>
-                <span className="block text-xs text-muted">{pack.photoCount} headshots · 4 styles</span>
+                <span className="block text-xs text-muted">
+                  {pack.photoCount} headshots · {looks.length} look{looks.length === 1 ? "" : "s"}
+                </span>
               </span>
               <span className="grid h-5 w-5 place-items-center rounded-full bg-electric text-[11px] text-white">✓</span>
             </div>
@@ -188,7 +242,7 @@ export function NewClient({ pack }: { pack: { name: string; photoCount: number }
           )}
 
           <button
-            disabled={files.length < 10 || !gender || submitting}
+            disabled={files.length < 10 || !gender || looks.length === 0 || submitting}
             onClick={submit}
             className="w-full rounded-full bg-electric px-5 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-electric-dim disabled:cursor-not-allowed disabled:opacity-40"
           >
@@ -198,7 +252,9 @@ export function NewClient({ pack }: { pack: { name: string; photoCount: number }
                 ? `Add ${10 - files.length} more photos`
                 : !gender
                   ? "Select who these photos are of"
-                  : "Start training →"}
+                  : looks.length === 0
+                    ? "Pick at least one look"
+                    : "Start training →"}
           </button>
           <Link href="/dashboard" className="block text-center text-sm font-medium text-muted hover:text-ink">
             Cancel

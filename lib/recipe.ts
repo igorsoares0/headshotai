@@ -66,12 +66,12 @@ export function initialGenCount(count: number): number {
   return Math.min(Math.ceil(count * OVERGEN_MARGIN), MAX_GEN_PER_ORDER);
 }
 
-/** Spread `total` images across the styles as evenly as possible. */
-export function distribute(total: number): Record<StyleKey, number> {
-  const base = Math.floor(total / STYLE_KEYS.length);
-  let rem = total - base * STYLE_KEYS.length;
-  const out = {} as Record<StyleKey, number>;
-  for (const k of STYLE_KEYS) out[k] = base + (rem-- > 0 ? 1 : 0);
+/** Spread `total` images across the given style keys as evenly as possible. */
+export function distribute(total: number, keys: string[]): Record<string, number> {
+  const base = Math.floor(total / keys.length);
+  let rem = total - base * keys.length;
+  const out: Record<string, number> = {};
+  for (const k of keys) out[k] = base + (rem-- > 0 ? 1 : 0);
   return out;
 }
 
@@ -118,54 +118,60 @@ export function describeSubject(gender: string, ethnicity?: string): string {
   return valid ? `${e} ${g}` : g;
 }
 
-export type StyleKey = "corporate" | "linkedin" | "bw_dramatic" | "outdoor";
+export type StyleKey = string; // a composed look key, e.g. "gray_navysuit"
 
-// Per-template params (reqs §13): a style is a full parameter set, not just a
-// prompt. These override GEN_BASE for the style. lora_scale stays 1.0 across the
-// board (identity is the priority); only guidance varies — lower lets the more
-// stylized looks breathe, higher keeps the literal ones crisp.
+// A "look" is composed from a background (setting + lighting) and an outfit
+// (reqs §13: a template is a full parameter set, not a one-off prompt). The
+// catalog is BACKGROUNDS × OUTFITS, so it scales to many looks without anyone
+// hand-writing prompts. Both halves are spliced into one shared, conservative
+// portrait template — the formula that produced the good Corporate/LinkedIn
+// results — so every combination behaves predictably.
+interface Fragment {
+  id: string;
+  label: string;
+  prompt: string; // fragment spliced into the portrait template
+}
+
+export const BACKGROUNDS: Fragment[] = [
+  { id: "gray", label: "Gray studio", prompt: "soft studio lighting, a clean neutral gray background" },
+  { id: "white", label: "White studio", prompt: "soft studio lighting, a bright seamless white background" },
+  { id: "office", label: "Office", prompt: "natural window light, a modern office softly blurred behind" },
+  { id: "park", label: "Outdoor", prompt: "soft natural daylight on the face, a softly blurred green park behind" },
+];
+
+export const OUTFITS: Fragment[] = [
+  { id: "navysuit", label: "Navy suit", prompt: "wearing a tailored navy business suit and a white shirt" },
+  { id: "blazer", label: "Blazer", prompt: "wearing a smart charcoal blazer over a crew-neck top" },
+  { id: "shirt", label: "Collared shirt", prompt: "wearing a smart casual collared shirt" },
+];
+
+/** Most looks a user can pick per order — overgen is split across the picks. */
+export const MAX_LOOKS = 4;
+
 interface Style {
   label: string;
   prompt: (subject: string) => string;
   params?: Record<string, string | number>;
 }
 
-export const STYLES: Record<StyleKey, Style> = {
-  corporate: {
-    label: "Corporate",
+function composeLook(bg: Fragment, outfit: Fragment): Style {
+  return {
+    label: `${outfit.label} · ${bg.label}`,
     prompt: (s) =>
-      `professional corporate headshot photo of ${TRIGGER}, a ${s} wearing a ` +
-      "tailored navy business suit and white shirt, soft studio lighting, clean " +
-      "neutral gray background, shallow depth of field, sharp focus on eyes, " +
-      "looking at camera, 85mm portrait, photorealistic",
-  },
-  linkedin: {
-    label: "LinkedIn",
-    prompt: (s) =>
-      `professional LinkedIn headshot of ${TRIGGER}, a ${s} in a smart casual ` +
-      "collared shirt, bright modern office blurred in the background, natural " +
-      "window light, confident friendly expression, high detail, photorealistic",
-    params: { guidance_scale: 3.2 },
-  },
-  bw_dramatic: {
-    label: "B&W Editorial",
-    prompt: (s) =>
-      `black and white professional studio portrait of ${TRIGGER}, a ${s} wearing ` +
-      "a dark shirt, soft even studio lighting, plain dark gray background, natural " +
-      "skin texture, sharp focus on the eyes, looking at camera, 85mm portrait, " +
-      "high detail, monochrome, photorealistic",
-  },
-  outdoor: {
-    label: "Outdoor",
-    prompt: (s) =>
-      `outdoor professional headshot of ${TRIGGER}, a ${s} wearing a smart casual ` +
-      "shirt, soft natural daylight on the face, softly blurred green park " +
-      "background, shallow depth of field, sharp focus on the eyes, looking at " +
-      "camera, 85mm portrait, photorealistic",
-  },
-};
+      `professional headshot photo of ${TRIGGER}, a ${s} ${outfit.prompt}, ${bg.prompt}, ` +
+      "shallow depth of field, sharp focus on the eyes, looking at camera, 85mm portrait, " +
+      "natural skin texture, high detail, photorealistic",
+  };
+}
 
-export const STYLE_KEYS = Object.keys(STYLES) as StyleKey[];
+// Catalog keyed by `${backgroundId}_${outfitId}` (BACKGROUNDS × OUTFITS).
+export const STYLES: Record<StyleKey, Style> = Object.fromEntries(
+  BACKGROUNDS.flatMap((bg) =>
+    OUTFITS.map((o) => [`${bg.id}_${o.id}`, composeLook(bg, o)] as [string, Style]),
+  ),
+);
+
+export const STYLE_KEYS = Object.keys(STYLES);
 
 // Rough Replicate H100 pricing for cost estimates ($/sec)
 export const H100_PER_SEC = 0.001525;

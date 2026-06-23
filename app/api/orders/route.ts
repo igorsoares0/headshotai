@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { startOrder, type UploadInput } from "@/lib/pipeline";
-import { describeSubject, GENDERS } from "@/lib/recipe";
+import { describeSubject, GENDERS, MAX_LOOKS, STYLE_KEYS } from "@/lib/recipe";
 import { summarizeRejections, validateSelfies } from "@/lib/validate";
 import { listOrders } from "@/lib/store";
 import {
@@ -58,6 +58,15 @@ export async function POST(request: NextRequest) {
   }
   const subject = describeSubject(gender, String(form.get("ethnicity") ?? ""));
 
+  // Looks the user picked (reqs §13). Keep only known catalog keys, dedupe, and
+  // cap at MAX_LOOKS; overgen is split across these.
+  const looks = [...new Set(form.getAll("looks").map(String))]
+    .filter((k) => STYLE_KEYS.includes(k))
+    .slice(0, MAX_LOOKS);
+  if (looks.length === 0) {
+    return Response.json({ error: "Pick at least one look." }, { status: 400 });
+  }
+
   // Validate selfies BEFORE consuming the pack — a bad upload shouldn't cost a
   // training run (reqs §9/§10). We train only on the photos that pass.
   const inputs: UploadInput[] = await Promise.all(
@@ -93,6 +102,7 @@ export async function POST(request: NextRequest) {
       session.user.id,
       purchase.photoCount,
       subject,
+      looks,
     );
     await linkPurchaseOrder(purchase.id, order.id);
     return Response.json({ id: order.id }, { status: 201 });
