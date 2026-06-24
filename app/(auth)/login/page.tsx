@@ -76,7 +76,7 @@ export default function LoginPage() {
             </div>
 
             {state?.message ? (
-              <p className="rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-3 text-sm text-red-600">
+              <p className="rounded-xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">
                 {state.message}
               </p>
             ) : null}
@@ -84,7 +84,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={pending}
-              className="w-full rounded-full bg-electric px-5 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-electric-dim disabled:cursor-not-allowed disabled:opacity-40"
+              className="w-full rounded-full bg-electric px-5 py-3.5 text-sm font-semibold text-white transition active:scale-[0.97] hover:bg-electric-dim disabled:cursor-not-allowed disabled:opacity-40"
             >
               {pending ? "Signing in…" : "Sign in"}
             </button>

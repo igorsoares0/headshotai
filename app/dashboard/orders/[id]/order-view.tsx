@@ -149,8 +149,8 @@ export function OrderView({ id }: { id: string }) {
         )}
 
         {order?.status === "failed" && (
-          <div className="rounded-card border border-red-500/30 bg-red-500/5 p-6">
-            <p className="font-bold tracking-tight text-red-600">Something went wrong</p>
+          <div className="rounded-card border border-danger/30 bg-danger/5 p-6">
+            <p className="font-bold text-danger">Something went wrong</p>
             <p className="mt-2 text-sm text-muted">{order.error}</p>
             <p className="mt-3 text-sm text-muted">
               This batch used your pack. Email us with your order ID and we&apos;ll make it
@@ -162,7 +162,7 @@ export function OrderView({ id }: { id: string }) {
               )}&body=${encodeURIComponent(
                 `My headshot batch (order ${id}) failed.\nError: ${order.error ?? "unknown"}`,
               )}`}
-              className="mt-4 inline-block rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-paper transition-colors hover:bg-ink-raised"
+              className="mt-4 inline-block rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-paper transition active:scale-[0.97] hover:bg-ink-raised"
             >
               Contact support
             </a>
@@ -187,7 +187,7 @@ export function OrderView({ id }: { id: string }) {
             <Gallery shots={delivered} />
 
             {alsoPassed.length > 0 && (
-              <details className="rounded-card border border-line bg-paper-raised p-5">
+              <details className="rounded-card border border-line bg-paper-raised p-6">
                 <summary className="cursor-pointer text-sm font-semibold text-muted">
                   {alsoPassed.length} more that look like you (outside your top {delivered.length})
                 </summary>

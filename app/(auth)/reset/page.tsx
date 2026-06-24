@@ -26,7 +26,7 @@ export default async function ResetPage({
           {token ? (
             <ResetForm token={token} />
           ) : (
-            <p className="mt-6 rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-3 text-sm text-red-600">
+            <p className="mt-6 rounded-xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">
               Missing reset token. Request a new link from the{" "}
               <Link href="/forgot" className="font-semibold underline">
                 forgot password

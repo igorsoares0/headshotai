@@ -53,7 +53,7 @@ export function BillingClient({ packs }: { packs: Pack[] }) {
   return (
     <div>
       {error ? (
-        <p className="mb-4 rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-3 text-sm text-red-600">
+        <p className="mb-4 rounded-xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">
           {error}
         </p>
       ) : null}
@@ -66,7 +66,7 @@ export function BillingClient({ packs }: { packs: Pack[] }) {
             }`}
           >
             <div className="flex items-center justify-between">
-              <p className="font-bold tracking-tight">{p.name}</p>
+              <p className="font-bold">{p.name}</p>
               {p.featured ? (
                 <span className="rounded-full bg-electric px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
                   Popular
@@ -88,7 +88,7 @@ export function BillingClient({ packs }: { packs: Pack[] }) {
             <button
               onClick={() => buy(p.id)}
               disabled={busy === p.id}
-              className="mt-6 rounded-full bg-electric px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-electric-dim disabled:cursor-not-allowed disabled:opacity-40"
+              className="mt-6 rounded-full bg-electric px-5 py-3 text-sm font-semibold text-white transition active:scale-[0.97] hover:bg-electric-dim disabled:cursor-not-allowed disabled:opacity-40"
             >
               {busy === p.id ? "Opening checkout…" : `Buy ${p.name}`}
             </button>

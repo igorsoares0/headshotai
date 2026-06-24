@@ -9,9 +9,9 @@
 
 @theme {
   /* Surfaces */
-  --color-paper: #e9e7df;
-  --color-paper-raised: #f1efe8;
-  --color-paper-sunken: #e1ded4;
+  --color-paper: #f5f6f7;
+  --color-paper-raised: #ffffff;
+  --color-paper-sunken: #e9ebec;
   --color-ink: #0c0c0d;
   --color-ink-soft: #141416;
   --color-ink-raised: #1c1c1f;
@@ -21,13 +21,17 @@
   --color-electric-bright: #3b51ff;
   --color-electric-dim: #1224c9;
 
+  /* Danger (coherent with the system, not raw Tailwind red) */
+  --color-danger: #d83a34;
+  --color-danger-dim: #b92e29;
+
   /* Text */
-  --color-muted: #6c6b63;
+  --color-muted: #5c5d5f;
   --color-muted-dark: #9c9b91;
   --color-faint: #a3a298;
 
   /* Lines */
-  --color-line: rgba(12, 12, 13, 0.12);
+  --color-line: rgba(12, 12, 13, 0.09);
   --color-line-strong: rgba(12, 12, 13, 0.24);
   --color-line-invert: rgba(255, 255, 255, 0.12);
 
@@ -58,12 +62,20 @@ body {
   color: var(--color-ink);
   font-family: var(--font-sans);
   /* faint paper grain for atmosphere */
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.02'/%3E%3C/svg%3E");
 }
 
 ::selection {
   background: var(--color-electric);
   color: #fff;
+}
+
+/* Accessible keyboard focus ring on all form controls */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  border-color: var(--color-electric);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-electric) 22%, transparent);
 }
 
 /* Reusable kicker / eyebrow label */
@@ -77,7 +89,7 @@ body {
 /* Tight display tracking for big headlines */
 .display {
   letter-spacing: -0.035em;
-  line-height: 0.92;
+  line-height: 0.96;
   font-weight: 800;
 }
 
@@ -100,6 +112,22 @@ body {
   animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
+/* Live progress bar — animated sheen while a batch is processing */
+@keyframes progress-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: 0 0; }
+}
+.progress-shimmer {
+  background-image: linear-gradient(
+    90deg,
+    var(--color-electric) 0%,
+    var(--color-electric-bright) 50%,
+    var(--color-electric) 100%
+  );
+  background-size: 200% 100%;
+  animation: progress-shimmer 1.6s linear infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .animate-marquee, .rise { animation: none; opacity: 1; }
+  .animate-marquee, .rise, .progress-shimmer { animation: none; opacity: 1; }
 }

@@ -33,7 +33,7 @@ export default async function ProfilePage() {
       <div className="grid gap-6 px-5 py-8 sm:px-8 lg:grid-cols-[1.4fr_1fr]">
         {/* details */}
         <div className="rounded-card border border-line bg-paper-raised p-6 sm:p-8">
-          <h2 className="font-bold tracking-tight">Account details</h2>
+          <h2 className="font-bold">Account details</h2>
           <div className="mt-6 flex items-center gap-4">
             <span className="grid h-16 w-16 place-items-center rounded-full bg-electric text-xl font-bold text-white">
               {initials(user.name, user.email)}
@@ -56,7 +56,7 @@ export default async function ProfilePage() {
               <>
                 <div className="mt-3 flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-electric" />
-                  <p className="font-bold tracking-tight">Trained &amp; ready</p>
+                  <p className="font-bold">Trained &amp; ready</p>
                 </div>
                 <p className="mt-2 text-sm text-muted">
                   Trained on {trained.photoCount} selfies · {fmtDate(trained.createdAt)}. Generate
@@ -64,7 +64,7 @@ export default async function ProfilePage() {
                 </p>
                 <Link
                   href={activePack ? "/dashboard/new" : "/dashboard/billing"}
-                  className="mt-5 block rounded-full bg-electric px-4 py-2.5 text-center text-sm font-semibold text-white transition-colors hover:bg-electric-dim"
+                  className="mt-5 block rounded-full bg-electric px-4 py-2.5 text-center text-sm font-semibold text-white transition active:scale-[0.97] hover:bg-electric-dim"
                 >
                   {activePack ? "Generate new headshots" : "Buy a pack to generate"}
                 </Link>
@@ -73,14 +73,14 @@ export default async function ProfilePage() {
               <>
                 <div className="mt-3 flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-ink/30" />
-                  <p className="font-bold tracking-tight">No model yet</p>
+                  <p className="font-bold">No model yet</p>
                 </div>
                 <p className="mt-2 text-sm text-muted">
                   Upload selfies on your first batch and we&apos;ll train your identity model.
                 </p>
                 <Link
                   href={activePack ? "/dashboard/new" : "/dashboard/billing"}
-                  className="mt-5 block rounded-full bg-electric px-4 py-2.5 text-center text-sm font-semibold text-white transition-colors hover:bg-electric-dim"
+                  className="mt-5 block rounded-full bg-electric px-4 py-2.5 text-center text-sm font-semibold text-white transition active:scale-[0.97] hover:bg-electric-dim"
                 >
                   {activePack ? "Start your first batch" : "Buy a pack to start"}
                 </Link>

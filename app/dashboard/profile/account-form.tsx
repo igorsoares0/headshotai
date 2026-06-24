@@ -27,7 +27,7 @@ export function AccountForm({
           className="mt-2 w-full rounded-xl border border-line bg-paper px-4 py-2.5 text-sm outline-none transition-colors focus:border-electric"
         />
         {state?.errors?.name ? (
-          <span className="mt-1 block text-xs text-red-600">{state.errors.name[0]}</span>
+          <span className="mt-1 block text-xs text-danger">{state.errors.name[0]}</span>
         ) : null}
       </label>
 
@@ -56,7 +56,7 @@ export function AccountForm({
         <button
           type="submit"
           disabled={pending}
-          className="rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-paper transition-colors hover:bg-ink-raised disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-paper transition active:scale-[0.97] hover:bg-ink-raised disabled:cursor-not-allowed disabled:opacity-40"
         >
           {pending ? "Saving…" : "Save changes"}
         </button>

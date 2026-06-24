@@ -33,7 +33,7 @@ export function MobileNav() {
         onClick={() => setOpen(true)}
         aria-label="Open menu"
         aria-expanded={open}
-        className="grid h-9 w-9 place-items-center rounded-lg text-ink transition-colors hover:bg-ink/5"
+        className="grid h-9 w-9 place-items-center rounded-xl text-ink transition-colors hover:bg-ink/5"
       >
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
           <path d="M3 6h18M3 12h18M3 18h18" />
@@ -67,7 +67,7 @@ export function MobileNav() {
                 type="button"
                 onClick={() => setOpen(false)}
                 aria-label="Close menu"
-                className="grid h-9 w-9 place-items-center rounded-lg text-muted transition-colors hover:bg-ink/5 hover:text-ink"
+                className="grid h-9 w-9 place-items-center rounded-xl text-muted transition-colors hover:bg-ink/5 hover:text-ink"
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
                   <path d="M6 6l12 12M18 6 6 18" />
@@ -99,7 +99,7 @@ export function MobileNav() {
               <Link
                 href="/dashboard/new"
                 onClick={close}
-                className="block rounded-full bg-electric px-4 py-2.5 text-center text-sm font-semibold text-white transition-colors hover:bg-electric-dim"
+                className="block rounded-full bg-electric px-4 py-2.5 text-center text-sm font-semibold text-white transition active:scale-[0.97] hover:bg-electric-dim"
               >
                 New headshots
               </Link>

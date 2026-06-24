@@ -46,7 +46,7 @@ export default async function OrdersPage() {
                         View {o.delivered} →
                       </Link>
                     ) : o.rawStatus === "failed" ? (
-                      <Link href={`/dashboard/orders/${o.id}`} className="text-sm font-medium text-red-600 hover:underline">
+                      <Link href={`/dashboard/orders/${o.id}`} className="text-sm font-medium text-danger hover:underline">
                         See details →
                       </Link>
                     ) : (
@@ -71,7 +71,7 @@ function EmptyState() {
       <p className="text-muted">No orders yet.</p>
       <Link
         href="/dashboard/new"
-        className="mt-4 rounded-full bg-electric px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-electric-dim"
+        className="mt-4 rounded-full bg-electric px-5 py-2.5 text-sm font-semibold text-white transition active:scale-[0.97] hover:bg-electric-dim"
       >
         Create your first batch
       </Link>

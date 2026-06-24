@@ -39,14 +39,14 @@ export default function ForgotPage() {
                   placeholder="you@example.com"
                 />
                 {state?.errors?.email ? (
-                  <p className="mt-1 text-xs text-red-600">{state.errors.email[0]}</p>
+                  <p className="mt-1 text-xs text-danger">{state.errors.email[0]}</p>
                 ) : null}
               </div>
 
               <button
                 type="submit"
                 disabled={pending}
-                className="w-full rounded-full bg-electric px-5 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-electric-dim disabled:cursor-not-allowed disabled:opacity-40"
+                className="w-full rounded-full bg-electric px-5 py-3.5 text-sm font-semibold text-white transition active:scale-[0.97] hover:bg-electric-dim disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {pending ? "Sending…" : "Send reset link"}
               </button>

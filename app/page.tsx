@@ -99,7 +99,7 @@ export default function Home() {
               >
                 <Link
                   href="/signup"
-                  className="rounded-full bg-ink px-6 py-3.5 text-sm font-semibold text-paper transition-colors hover:bg-ink-raised"
+                  className="rounded-full bg-ink px-6 py-3.5 text-sm font-semibold text-paper transition active:scale-[0.97] hover:bg-ink-raised"
                 >
                   Create my headshots
                 </Link>
@@ -158,7 +158,7 @@ export default function Home() {
                   (b) => (
                     <span
                       key={`${r}-${b}`}
-                      className="text-xl font-bold tracking-tight text-ink/35"
+                      className="text-xl font-bold text-ink/35"
                     >
                       {b}
                     </span>
@@ -185,7 +185,7 @@ export default function Home() {
                 className="group flex flex-col bg-paper-raised p-7 transition-colors hover:bg-paper-sunken"
               >
                 <span className="font-mono text-sm text-electric">{s.n}</span>
-                <h3 className="mt-10 text-xl font-bold tracking-tight">{s.title}</h3>
+                <h3 className="mt-10 text-xl font-bold">{s.title}</h3>
                 <p className="mt-3 text-sm leading-relaxed text-muted">{s.body}</p>
               </div>
             ))}
@@ -231,7 +231,7 @@ export default function Home() {
               >
                 <Portrait
                   seed={i * 19 + 5}
-                  className="aspect-[16/10] w-full"
+                  className="aspect-[16/10] w-full transition-transform duration-500 ease-out group-hover:scale-[1.04]"
                   label={c.category}
                 />
                 <div className="flex flex-wrap gap-2 p-5">
@@ -270,7 +270,7 @@ export default function Home() {
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <h3 className="text-xl font-bold tracking-tight">{p.name}</h3>
+                    <h3 className="text-xl font-bold">{p.name}</h3>
                     {p.featured ? (
                       <span className="kicker rounded-full bg-electric px-3 py-1 text-white">
                         Popular

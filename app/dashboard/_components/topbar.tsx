@@ -36,7 +36,7 @@ export function Topbar({
         </div>
         <Link
           href="/dashboard/new"
-          className="rounded-full bg-electric px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-electric-dim"
+          className="rounded-full bg-electric px-4 py-2 text-sm font-semibold text-white transition active:scale-[0.97] hover:bg-electric-dim"
         >
           New headshots
         </Link>

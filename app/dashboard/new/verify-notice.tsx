@@ -24,7 +24,7 @@ export function VerifyNotice({ email }: { email: string }) {
           type="button"
           disabled={pending}
           onClick={() => start(async () => { await resendVerification(); setSent(true); })}
-          className="mt-6 rounded-full bg-electric px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-electric-dim disabled:cursor-not-allowed disabled:opacity-40"
+          className="mt-6 rounded-full bg-electric px-5 py-3 text-sm font-semibold text-white transition active:scale-[0.97] hover:bg-electric-dim disabled:cursor-not-allowed disabled:opacity-40"
         >
           {pending ? "Sending…" : "Resend verification email"}
         </button>

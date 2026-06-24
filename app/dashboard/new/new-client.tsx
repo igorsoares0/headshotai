@@ -152,7 +152,7 @@ export function NewClient({ pack }: { pack: { name: string; photoCount: number }
         <div className="space-y-6">
           <div className="rounded-card border border-line bg-paper-raised p-6">
             <div className="flex items-center justify-between">
-              <h2 className="font-bold tracking-tight">Upload selfies</h2>
+              <h2 className="font-bold">Upload selfies</h2>
               <span className="kicker text-muted">{files.length}/25 added</span>
             </div>
 
@@ -200,7 +200,7 @@ export function NewClient({ pack }: { pack: { name: string; photoCount: number }
             {previews.length > 0 && (
               <div className="mt-5 grid grid-cols-5 gap-2 sm:grid-cols-6">
                 {previews.map((p, i) => (
-                  <div key={p.key} className="group relative aspect-square overflow-hidden rounded-lg border border-line">
+                  <div key={p.key} className="group relative aspect-square overflow-hidden rounded-xl border border-line">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={p.url} alt="" className="h-full w-full object-cover" />
                     <button
@@ -233,7 +233,7 @@ export function NewClient({ pack }: { pack: { name: string; photoCount: number }
           {/* subject — anchors gender/ethnicity in the prompt so the model
               keeps your identity instead of drifting */}
           <div className="rounded-card border border-line bg-paper-raised p-6">
-            <h2 className="font-bold tracking-tight">Who are these photos of?</h2>
+            <h2 className="font-bold">Who are these photos of?</h2>
             <p className="mt-1 text-xs text-muted">
               Helps the model keep your gender and features consistent.
             </p>
@@ -276,7 +276,7 @@ export function NewClient({ pack }: { pack: { name: string; photoCount: number }
               across these, so fewer picks = more shots per look */}
           <div className="rounded-card border border-line bg-paper-raised p-6">
             <div className="flex items-center justify-between">
-              <h2 className="font-bold tracking-tight">Pick your looks</h2>
+              <h2 className="font-bold">Pick your looks</h2>
               <span className="kicker text-muted">
                 {looks.length}/{MAX_LOOKS} selected
               </span>
@@ -315,7 +315,7 @@ export function NewClient({ pack }: { pack: { name: string; photoCount: number }
         {/* pack summary + submit */}
         <div className="space-y-6">
           <div className="rounded-card border border-line bg-paper-raised p-6">
-            <h2 className="font-bold tracking-tight">Your pack</h2>
+            <h2 className="font-bold">Your pack</h2>
             <div className="mt-4 flex items-center justify-between rounded-xl border border-electric bg-electric/5 p-4">
               <span>
                 <span className="block text-sm font-semibold">{pack.name}</span>
@@ -331,13 +331,13 @@ export function NewClient({ pack }: { pack: { name: string; photoCount: number }
           </div>
 
           {error && (
-            <p className="rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-3 text-sm text-red-600">{error}</p>
+            <p className="rounded-xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">{error}</p>
           )}
 
           <button
             disabled={files.length < 10 || !gender || looks.length === 0 || submitting}
             onClick={submit}
-            className="w-full rounded-full bg-electric px-5 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-electric-dim disabled:cursor-not-allowed disabled:opacity-40"
+            className="w-full rounded-full bg-electric px-5 py-3.5 text-sm font-semibold text-white transition active:scale-[0.97] hover:bg-electric-dim disabled:cursor-not-allowed disabled:opacity-40"
           >
             {submitting
               ? progress < 100

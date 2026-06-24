@@ -62,7 +62,7 @@ export function Sidebar({
         </p>
         <Link
           href={activePack ? "/dashboard/new" : "/dashboard/billing"}
-          className="mt-3 block rounded-full bg-electric px-3 py-2 text-center text-xs font-semibold text-white transition-colors hover:bg-electric-dim"
+          className="mt-3 block rounded-full bg-electric px-3 py-2 text-center text-xs font-semibold text-white transition active:scale-[0.97] hover:bg-electric-dim"
         >
           {activePack ? "Generate" : "Buy a pack"}
         </Link>
@@ -80,7 +80,7 @@ export function Sidebar({
           <button
             type="submit"
             title="Sign out"
-            className="grid h-8 w-8 place-items-center rounded-lg text-muted transition-colors hover:bg-ink/5 hover:text-ink"
+            className="grid h-8 w-8 place-items-center rounded-xl text-muted transition-colors hover:bg-ink/5 hover:text-ink"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />

@@ -1,6 +1,6 @@
 const styles: Record<string, string> = {
   READY: "bg-electric/10 text-electric border-electric/30",
-  FAILED: "bg-red-500/10 text-red-600 border-red-500/30",
+  FAILED: "bg-danger/10 text-danger border-danger/30",
   default: "bg-ink/5 text-ink/70 border-line-strong",
 };
 

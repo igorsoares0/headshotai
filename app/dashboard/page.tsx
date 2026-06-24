@@ -42,7 +42,7 @@ export default async function DashboardHome() {
         {/* summary cards */}
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {summary.map((s) => (
-            <div key={s.label} className="rounded-card border border-line bg-paper-raised p-5">
+            <div key={s.label} className="rounded-card border border-line bg-paper-raised p-6">
               <p className="kicker text-muted">{s.label}</p>
               <p className="mt-3 text-4xl font-extrabold tracking-tight">{s.value}</p>
               <p className="mt-1 text-xs text-muted">{s.hint}</p>
@@ -59,7 +59,7 @@ export default async function DashboardHome() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="kicker text-muted-dark">Order {active.id}</p>
-                <h2 className="mt-1 text-xl font-bold tracking-tight">
+                <h2 className="mt-1 text-xl font-bold">
                   {active.status === "training"
                     ? "Training your identity model…"
                     : active.status === "generating"
@@ -93,7 +93,7 @@ export default async function DashboardHome() {
 
             <div className="mt-6 h-1.5 overflow-hidden rounded-full bg-ink-raised">
               <div
-                className="h-full rounded-full bg-electric transition-all"
+                className="progress-shimmer h-full rounded-full transition-all"
                 style={{ width: `${((currentIdx + 0.5) / STAGES.length) * 100}%` }}
               />
             </div>
@@ -101,7 +101,7 @@ export default async function DashboardHome() {
         ) : (
           <div className="rounded-card border border-line bg-paper-raised p-6 sm:p-8">
             <p className="kicker text-muted">No active batch</p>
-            <h2 className="mt-1 text-xl font-bold tracking-tight">Ready when you are</h2>
+            <h2 className="mt-1 text-xl font-bold">Ready when you are</h2>
             <p className="mt-2 text-sm text-muted">Upload your selfies and generate a fresh set of headshots.</p>
           </div>
         )}
@@ -110,7 +110,7 @@ export default async function DashboardHome() {
         <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
           <div className="rounded-card border border-line bg-paper-raised p-6">
             <div className="flex items-center justify-between">
-              <h3 className="font-bold tracking-tight">Recent headshots</h3>
+              <h3 className="font-bold">Recent headshots</h3>
               <Link href="/dashboard/gallery" className="text-sm font-medium text-electric hover:underline">
                 View gallery →
               </Link>
@@ -137,7 +137,7 @@ export default async function DashboardHome() {
               </svg>
             </div>
             <div className="mt-10">
-              <h3 className="text-lg font-bold tracking-tight">Start a new batch</h3>
+              <h3 className="text-lg font-bold">Start a new batch</h3>
               <p className="mt-2 text-sm text-muted">
                 Upload selfies and generate a fresh set of styles from your identity model.
               </p>

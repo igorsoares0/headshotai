@@ -20,7 +20,7 @@ export function SiteFooter() {
           <div className="flex flex-col gap-3 md:items-end">
             <Link
               href="/dashboard"
-              className="inline-flex items-center justify-center rounded-full bg-electric px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-electric-bright"
+              className="inline-flex items-center justify-center rounded-full bg-electric px-6 py-3 text-sm font-semibold text-white transition active:scale-[0.97] hover:bg-electric-bright"
             >
               Upload your selfies →
             </Link>

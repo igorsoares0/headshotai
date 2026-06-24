@@ -15,7 +15,7 @@ export function ResetForm({ token }: { token: string }) {
         </p>
         <Link
           href="/login"
-          className="block w-full rounded-full bg-electric px-5 py-3.5 text-center text-sm font-semibold text-white transition-colors hover:bg-electric-dim"
+          className="block w-full rounded-full bg-electric px-5 py-3.5 text-center text-sm font-semibold text-white transition active:scale-[0.97] hover:bg-electric-dim"
         >
           Sign in
         </Link>
@@ -38,12 +38,12 @@ export function ResetForm({ token }: { token: string }) {
           placeholder="At least 8 characters"
         />
         {state?.errors?.password ? (
-          <p className="mt-1 text-xs text-red-600">{state.errors.password[0]}</p>
+          <p className="mt-1 text-xs text-danger">{state.errors.password[0]}</p>
         ) : null}
       </div>
 
       {state?.message && state.message !== "ok" ? (
-        <p className="rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-3 text-sm text-red-600">
+        <p className="rounded-xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">
           {state.message}
         </p>
       ) : null}
@@ -51,7 +51,7 @@ export function ResetForm({ token }: { token: string }) {
       <button
         type="submit"
         disabled={pending}
-        className="w-full rounded-full bg-electric px-5 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-electric-dim disabled:cursor-not-allowed disabled:opacity-40"
+        className="w-full rounded-full bg-electric px-5 py-3.5 text-sm font-semibold text-white transition active:scale-[0.97] hover:bg-electric-dim disabled:cursor-not-allowed disabled:opacity-40"
       >
         {pending ? "Saving…" : "Update password"}
       </button>

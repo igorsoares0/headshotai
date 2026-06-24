@@ -40,13 +40,13 @@ export default async function BillingPage() {
         </div>
 
         <div>
-          <h2 className="mb-4 font-bold tracking-tight">Choose a pack</h2>
+          <h2 className="mb-4 font-bold">Choose a pack</h2>
           <BillingClient packs={PACKS} />
         </div>
 
         {purchases.length > 0 ? (
           <div>
-            <h2 className="mb-4 font-bold tracking-tight">Purchases</h2>
+            <h2 className="mb-4 font-bold">Purchases</h2>
             <div className="overflow-hidden rounded-card border border-line bg-paper-raised">
               <ul className="divide-y divide-line">
                 {purchases.map((p) => (

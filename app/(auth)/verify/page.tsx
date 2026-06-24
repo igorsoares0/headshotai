@@ -35,7 +35,7 @@ export default async function VerifyPage({
           </p>
           <Link
             href="/dashboard"
-            className="mt-6 inline-block rounded-full bg-electric px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-electric-dim"
+            className="mt-6 inline-block rounded-full bg-electric px-5 py-3 text-sm font-semibold text-white transition active:scale-[0.97] hover:bg-electric-dim"
           >
             Go to dashboard
           </Link>

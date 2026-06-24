@@ -35,7 +35,7 @@ export default function SignupPage() {
                 placeholder="Ada Lovelace"
               />
               {state?.errors?.name ? (
-                <p className="mt-1 text-xs text-red-600">{state.errors.name[0]}</p>
+                <p className="mt-1 text-xs text-danger">{state.errors.name[0]}</p>
               ) : null}
             </div>
             <div>
@@ -50,7 +50,7 @@ export default function SignupPage() {
                 placeholder="you@example.com"
               />
               {state?.errors?.email ? (
-                <p className="mt-1 text-xs text-red-600">{state.errors.email[0]}</p>
+                <p className="mt-1 text-xs text-danger">{state.errors.email[0]}</p>
               ) : null}
             </div>
             <div>
@@ -87,12 +87,12 @@ export default function SignupPage() {
                 </button>
               </div>
               {state?.errors?.password ? (
-                <p className="mt-1 text-xs text-red-600">{state.errors.password[0]}</p>
+                <p className="mt-1 text-xs text-danger">{state.errors.password[0]}</p>
               ) : null}
             </div>
 
             {state?.message ? (
-              <p className="rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-3 text-sm text-red-600">
+              <p className="rounded-xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">
                 {state.message}
               </p>
             ) : null}
@@ -100,7 +100,7 @@ export default function SignupPage() {
             <button
               type="submit"
               disabled={pending}
-              className="w-full rounded-full bg-electric px-5 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-electric-dim disabled:cursor-not-allowed disabled:opacity-40"
+              className="w-full rounded-full bg-electric px-5 py-3.5 text-sm font-semibold text-white transition active:scale-[0.97] hover:bg-electric-dim disabled:cursor-not-allowed disabled:opacity-40"
             >
               {pending ? "Creating account…" : "Create account"}
             </button>
