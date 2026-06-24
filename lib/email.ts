@@ -57,6 +57,26 @@ export async function sendVerificationEmail(to: string, token: string): Promise<
   );
 }
 
+export async function sendOrderReadyEmail(
+  to: string,
+  orderId: string,
+  count: number,
+  firstName?: string,
+): Promise<void> {
+  const href = `${appBaseUrl()}/dashboard/orders/${orderId}`;
+  const hi = firstName ? `${firstName}, your` : "Your";
+  await send(
+    to,
+    "Your headshots are ready",
+    shell(
+      "Your headshots are ready 🎉",
+      `${hi} batch is done — ${count} professional headshot${count === 1 ? "" : "s"} are ready to view and download.`,
+      "View my headshots",
+      href,
+    ),
+  );
+}
+
 export async function sendPasswordResetEmail(to: string, token: string): Promise<void> {
   const href = `${appBaseUrl()}/reset?token=${encodeURIComponent(token)}`;
   await send(

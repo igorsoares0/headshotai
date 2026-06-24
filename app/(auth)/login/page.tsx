@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { authenticate } from "@/app/actions/auth";
 
 export default function LoginPage() {
   const [state, action, pending] = useActionState(authenticate, undefined);
+  const [showPassword, setShowPassword] = useState(false);
 
   return (
     <main className="grid min-h-screen place-items-center bg-paper px-5 py-12">
@@ -41,15 +42,37 @@ export default function LoginPage() {
                   Forgot?
                 </Link>
               </div>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                className="mt-1.5 w-full rounded-xl border border-line bg-paper px-4 py-3 text-sm outline-none transition-colors focus:border-electric"
-                placeholder="••••••••"
-              />
+              <div className="relative mt-1.5">
+                <input
+                  id="password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  required
+                  className="w-full rounded-xl border border-line bg-paper px-4 py-3 pr-12 text-sm outline-none transition-colors focus:border-electric"
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  aria-pressed={showPassword}
+                  className="absolute inset-y-0 right-0 grid w-11 place-items-center text-muted transition-colors hover:text-ink"
+                >
+                  {showPassword ? (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 3l18 18" />
+                      <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+                      <path d="M9.4 5.2A9.5 9.5 0 0 1 12 5c5 0 9 4.5 9 7a12 12 0 0 1-2.2 2.9M6.2 6.2A12 12 0 0 0 3 12c0 2.5 4 7 9 7a9.5 9.5 0 0 0 3-.5" />
+                    </svg>
+                  ) : (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  )}
+                </button>
+              </div>
             </div>
 
             {state?.message ? (

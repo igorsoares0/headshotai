@@ -40,6 +40,8 @@ import {
   uploadFile,
 } from "./replicate";
 import { type Order, newOrderId, saveOrder } from "./store";
+import { prisma } from "./prisma";
+import { sendOrderReadyEmail } from "./email";
 
 export interface UploadInput {
   buffer: Buffer;
@@ -145,9 +147,37 @@ export async function advanceOrder(order: Order): Promise<Order> {
         );
       }
     } while (dirty.has(order.id) && !["ready", "failed"].includes(order.status));
+    // We only reach here when the order wasn't ready at entry (guard above), so
+    // status === "ready" now means *this* call made the transition — notify once.
+    // (cast: TS narrows status from the entry guard and can't see the tick mutations)
+    if ((order.status as string) === "ready") await notifyReady(order);
     return order;
   } finally {
     advancing.delete(order.id);
+  }
+}
+
+/**
+ * Email the owner that their batch is done. Best-effort: a failed send must never
+ * disrupt the pipeline or trigger a retry (the order is already "ready"). The
+ * Resend idempotency key (derived from the unique order link) dedupes any
+ * accidental re-fire.
+ */
+async function notifyReady(order: Order): Promise<void> {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: order.userId },
+      select: { email: true, name: true },
+    });
+    if (!user?.email) return;
+    const count = order.shots.filter((s) => s.delivered).length;
+    const firstName = user.name?.trim().split(/\s+/)[0];
+    await sendOrderReadyEmail(user.email, order.id, count, firstName);
+  } catch (err) {
+    console.error(
+      `[order ${order.id}] ready-email failed:`,
+      err instanceof Error ? err.message : err,
+    );
   }
 }
 

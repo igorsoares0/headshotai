@@ -7,12 +7,14 @@ import type { GalleryShot } from "@/lib/view";
 export function GalleryClient({
   shots,
   categories,
+  userId,
 }: {
   shots: GalleryShot[];
   categories: string[];
+  userId: string;
 }) {
   const [filter, setFilter] = useState("All");
-  const { favs, toggle } = useFavorites();
+  const { favs, toggle } = useFavorites(userId);
 
   const visible = useMemo(
     () => (filter === "All" ? shots : shots.filter((s) => s.styleLabel === filter)),
@@ -44,10 +46,6 @@ export function GalleryClient({
             <div key={shot.id} className="group relative overflow-hidden rounded-card border border-line">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={shot.file} alt={shot.styleLabel} className="aspect-[4/5] w-full object-cover" />
-
-              <span className="kicker absolute left-2 top-2 rounded-full bg-black/40 px-2 py-1 text-[10px] text-white backdrop-blur-sm">
-                {shot.score}↑
-              </span>
 
               <button
                 onClick={() => toggle(shot.id)}

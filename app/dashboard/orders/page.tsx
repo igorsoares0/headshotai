@@ -46,8 +46,8 @@ export default async function OrdersPage() {
                         View {o.delivered} →
                       </Link>
                     ) : o.rawStatus === "failed" ? (
-                      <Link href="/dashboard/new" className="text-sm font-medium text-ink/70 hover:text-ink">
-                        Retry
+                      <Link href={`/dashboard/orders/${o.id}`} className="text-sm font-medium text-red-600 hover:underline">
+                        See details →
                       </Link>
                     ) : (
                       <Link href={`/dashboard/orders/${o.id}`} className="text-sm text-muted hover:text-ink">

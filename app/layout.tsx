@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Aperture — Studio headshots without the studio",
   description:
-    "AI-generated professional headshots from your selfies. Upload, train, and download studio-quality portraits in minutes.",
+    "AI-generated professional headshots from your selfies. Upload, train, and download studio-quality portraits in about 30 minutes.",
 };
 
 export default function RootLayout({

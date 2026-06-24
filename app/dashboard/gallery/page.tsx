@@ -6,7 +6,8 @@ import { GalleryClient } from "./gallery-client";
 export const dynamic = "force-dynamic";
 
 export default async function GalleryPage() {
-  const shots = await galleryShots(await requireUserId());
+  const userId = await requireUserId();
+  const shots = await galleryShots(userId);
   const categories = ["All", ...Array.from(new Set(shots.map((s) => s.styleLabel)))];
 
   return (
@@ -18,7 +19,7 @@ export default async function GalleryPage() {
             <p className="text-muted">No headshots yet — finish a batch to see them here.</p>
           </div>
         ) : (
-          <GalleryClient shots={shots} categories={categories} />
+          <GalleryClient shots={shots} categories={categories} userId={userId} />
         )}
       </div>
     </>

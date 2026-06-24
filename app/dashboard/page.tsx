@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Topbar } from "@/app/dashboard/_components/topbar";
 import { StatusBadge } from "@/app/dashboard/_components/status-badge";
 import { activeOrder, dashboardStats, galleryShots } from "@/lib/view";
-import { requireUserId } from "@/lib/dal";
+import { getUser } from "@/lib/dal";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +17,9 @@ const STAGE_LABEL: Record<(typeof STAGES)[number], string> = {
 };
 
 export default async function DashboardHome() {
-  const userId = await requireUserId();
+  const user = await getUser();
+  const userId = user.id;
+  const firstName = user.name?.trim().split(/\s+/)[0];
   const stats = await dashboardStats(userId);
   const active = await activeOrder(userId);
   const recent = (await galleryShots(userId)).slice(0, 8);
@@ -34,7 +36,7 @@ export default async function DashboardHome() {
 
   return (
     <>
-      <Topbar title="Dashboard" subtitle="Welcome back, Igor" />
+      <Topbar title="Dashboard" subtitle={firstName ? `Welcome back, ${firstName}` : "Welcome back"} />
 
       <div className="space-y-8 px-5 py-8 sm:px-8">
         {/* summary cards */}

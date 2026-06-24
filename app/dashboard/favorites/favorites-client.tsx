@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useFavorites } from "@/app/dashboard/_components/use-favorites";
 import type { GalleryShot } from "@/lib/view";
 
-export function FavoritesClient({ shots }: { shots: GalleryShot[] }) {
-  const { favs } = useFavorites();
+export function FavoritesClient({ shots, userId }: { shots: GalleryShot[]; userId: string }) {
+  const { favs } = useFavorites(userId);
   const favorites = shots.filter((s) => favs.has(s.id));
 
   if (favorites.length === 0) {

@@ -11,6 +11,23 @@ const DEFAULT_LOOKS = ["gray_navysuit", "white_blazer", "office_shirt", "park_sh
   STYLE_KEYS.includes(k),
 );
 
+// Client-side upload guards — catch bad photos *before* we burn a training run on
+// them. Mirrors the copy in the requirements checklist below.
+const MAX_FILES = 25;
+const MAX_BYTES = 15 * 1024 * 1024; // 15MB
+const MIN_DIM = 1024; // px on the longer edge
+
+async function imageDims(file: File): Promise<{ w: number; h: number } | null> {
+  try {
+    const bmp = await createImageBitmap(file);
+    const dims = { w: bmp.width, h: bmp.height };
+    bmp.close();
+    return dims;
+  } catch {
+    return null;
+  }
+}
+
 export function NewClient({ pack }: { pack: { name: string; photoCount: number } }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -19,7 +36,9 @@ export function NewClient({ pack }: { pack: { name: string; photoCount: number }
   const [ethnicity, setEthnicity] = useState("");
   const [looks, setLooks] = useState<string[]>(DEFAULT_LOOKS);
   const [submitting, setSubmitting] = useState(false);
+  const [progress, setProgress] = useState(0); // upload %, 0–100
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   function toggleLook(key: string) {
     setLooks((prev) =>
@@ -37,30 +56,91 @@ export function NewClient({ pack }: { pack: { name: string; photoCount: number }
   );
   useEffect(() => () => previews.forEach((p) => URL.revokeObjectURL(p.url)), [previews]);
 
-  function addFiles(list: FileList | null) {
+  async function addFiles(list: FileList | null) {
     if (!list) return;
-    const incoming = Array.from(list).filter((f) => f.type.startsWith("image/"));
-    setFiles((prev) => [...prev, ...incoming].slice(0, 25));
     setError(null);
+
+    const seen = new Set(files.map((f) => f.name + f.size));
+    const accepted: File[] = [];
+    const skipped: string[] = [];
+
+    for (const f of Array.from(list)) {
+      if (!f.type.startsWith("image/")) {
+        skipped.push(`${f.name}: not an image`);
+        continue;
+      }
+      const key = f.name + f.size;
+      if (seen.has(key)) continue; // exact duplicate — skip silently
+      if (f.size > MAX_BYTES) {
+        skipped.push(`${f.name}: over 15MB`);
+        continue;
+      }
+      const dims = await imageDims(f);
+      if (!dims) {
+        skipped.push(`${f.name}: couldn't read image`);
+        continue;
+      }
+      if (Math.max(dims.w, dims.h) < MIN_DIM) {
+        skipped.push(`${f.name}: under ${MIN_DIM}px`);
+        continue;
+      }
+      seen.add(key);
+      accepted.push(f);
+    }
+
+    const room = MAX_FILES - files.length;
+    const toAdd = accepted.slice(0, Math.max(0, room));
+    if (accepted.length > toAdd.length) {
+      skipped.push(`${accepted.length - toAdd.length} over the ${MAX_FILES}-photo limit`);
+    }
+    if (toAdd.length) setFiles((prev) => [...prev, ...toAdd]);
+
+    setNotice(
+      skipped.length
+        ? `Skipped ${skipped.length} photo${skipped.length === 1 ? "" : "s"} — ${skipped
+            .slice(0, 3)
+            .join("; ")}${skipped.length > 3 ? "; …" : ""}`
+        : null,
+    );
   }
 
-  async function submit() {
+  // XHR (not fetch) so we can show real upload progress — uploading up to 25
+  // photos can take a while and a frozen-looking button erodes trust.
+  function submit() {
     setSubmitting(true);
     setError(null);
-    try {
-      const fd = new FormData();
-      files.forEach((f) => fd.append("photos", f));
-      fd.append("gender", gender);
-      fd.append("ethnicity", ethnicity);
-      looks.forEach((k) => fd.append("looks", k));
-      const res = await fetch("/api/orders", { method: "POST", body: fd });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Something went wrong");
-      router.push(`/dashboard/orders/${json.id}`);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to start");
+    setProgress(0);
+
+    const fd = new FormData();
+    files.forEach((f) => fd.append("photos", f));
+    fd.append("gender", gender);
+    fd.append("ethnicity", ethnicity);
+    looks.forEach((k) => fd.append("looks", k));
+
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/orders");
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) setProgress(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onload = () => {
+      let json: { id?: string; error?: string } = {};
+      try {
+        json = JSON.parse(xhr.responseText);
+      } catch {
+        /* non-JSON response falls through to the error branch */
+      }
+      if (xhr.status >= 200 && xhr.status < 300 && json.id) {
+        router.push(`/dashboard/orders/${json.id}`);
+      } else {
+        setError(json.error || "Something went wrong");
+        setSubmitting(false);
+      }
+    };
+    xhr.onerror = () => {
+      setError("Upload failed — check your connection and try again.");
       setSubmitting(false);
-    }
+    };
+    xhr.send(fd);
   }
 
   return (
@@ -82,7 +162,10 @@ export function NewClient({ pack }: { pack: { name: string; photoCount: number }
               accept="image/*"
               multiple
               hidden
-              onChange={(e) => addFiles(e.target.files)}
+              onChange={(e) => {
+                addFiles(e.target.files);
+                e.target.value = ""; // allow re-picking a file that was removed
+              }}
             />
 
             <label
@@ -106,6 +189,12 @@ export function NewClient({ pack }: { pack: { name: string; photoCount: number }
               <p className="mt-4 text-sm font-semibold">Drag &amp; drop or click to upload</p>
               <p className="mt-1 text-xs text-muted">JPG, JPEG or PNG · up to 15MB each · 10–25 photos</p>
             </label>
+
+            {notice && (
+              <p className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-xs text-amber-700">
+                {notice}
+              </p>
+            )}
 
             {/* thumbnails */}
             {previews.length > 0 && (
@@ -192,7 +281,11 @@ export function NewClient({ pack }: { pack: { name: string; photoCount: number }
                 {looks.length}/{MAX_LOOKS} selected
               </span>
             </div>
-            <p className="mt-1 text-xs text-muted">Choose up to {MAX_LOOKS}. Outfit · background.</p>
+            <p className={`mt-1 text-xs ${looks.length >= MAX_LOOKS ? "text-amber-700" : "text-muted"}`}>
+              {looks.length >= MAX_LOOKS
+                ? `Maximum ${MAX_LOOKS} reached — remove one to pick another.`
+                : `Choose up to ${MAX_LOOKS}. Outfit · background.`}
+            </p>
             <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3">
               {STYLE_KEYS.map((key) => {
                 const on = looks.includes(key);
@@ -247,7 +340,9 @@ export function NewClient({ pack }: { pack: { name: string; photoCount: number }
             className="w-full rounded-full bg-electric px-5 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-electric-dim disabled:cursor-not-allowed disabled:opacity-40"
           >
             {submitting
-              ? "Starting…"
+              ? progress < 100
+                ? `Uploading… ${progress}%`
+                : "Starting…"
               : files.length < 10
                 ? `Add ${10 - files.length} more photos`
                 : !gender
@@ -256,6 +351,15 @@ export function NewClient({ pack }: { pack: { name: string; photoCount: number }
                     ? "Pick at least one look"
                     : "Start training →"}
           </button>
+
+          {submitting && (
+            <div className="h-1.5 overflow-hidden rounded-full bg-paper-sunken">
+              <div
+                className="h-full rounded-full bg-electric transition-all duration-200"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          )}
           <Link href="/dashboard" className="block text-center text-sm font-medium text-muted hover:text-ink">
             Cancel
           </Link>

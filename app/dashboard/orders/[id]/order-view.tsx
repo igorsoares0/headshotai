@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Topbar } from "@/app/dashboard/_components/topbar";
-import { GATE, H100_PER_SEC, STYLES, type StyleKey } from "@/lib/recipe";
+import { STYLES, type StyleKey } from "@/lib/recipe";
 
 type Shot = {
   id: string;
@@ -31,7 +31,7 @@ type Order = {
 };
 
 const STAGES: { key: Order["status"]; label: string; hint: string }[] = [
-  { key: "training", label: "Training", hint: "Learning your face (~20-30 min)" },
+  { key: "training", label: "Training", hint: "Learning your face — the longest step" },
   { key: "generating", label: "Generating", hint: "Creating your headshots" },
   { key: "gating", label: "Reviewing", hint: "Keeping only the ones that look like you" },
   { key: "scoring", label: "Selecting", hint: "Scoring and picking your best shots" },
@@ -87,12 +87,10 @@ export function OrderView({ id }: { id: string }) {
 
   const currentIdx = order ? STAGES.findIndex((s) => s.key === order.status) : 0;
   // Delivered = the top-N actually selected (upscaled). Headline these. Shots that
-  // cleared identity but weren't selected go to an "also passed" section; NSFW
-  // ones are never surfaced. Rejected = failed the identity gate.
+  // cleared identity but weren't selected go to an "also passed" section. Shots that
+  // failed the identity gate or were flagged NSFW are never surfaced to the user.
   const delivered = order?.shots.filter((s) => s.delivered) ?? [];
   const alsoPassed = order?.shots.filter((s) => s.pass && !s.delivered && !s.nsfw) ?? [];
-  const rejected =
-    order?.shots.filter((s) => s.file && s.pass === false && s.similarity !== undefined) ?? [];
 
   return (
     <>
@@ -137,6 +135,16 @@ export function OrderView({ id }: { id: string }) {
                 <ProgressLine order={order} />
               </p>
             )}
+
+            {/* reassurance: this takes a while, so let them leave */}
+            {order && order.status !== "ready" && (
+              <p className="mt-3 flex items-center gap-2 text-xs text-muted">
+                <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-ink text-[9px] text-paper">
+                  ✉
+                </span>
+                You can close this page — we&apos;ll email you when your headshots are ready.
+              </p>
+            )}
           </div>
         )}
 
@@ -144,9 +152,20 @@ export function OrderView({ id }: { id: string }) {
           <div className="rounded-card border border-red-500/30 bg-red-500/5 p-6">
             <p className="font-bold tracking-tight text-red-600">Something went wrong</p>
             <p className="mt-2 text-sm text-muted">{order.error}</p>
-            <Link href="/dashboard/new" className="mt-4 inline-block text-sm font-medium text-electric hover:underline">
-              Try again →
-            </Link>
+            <p className="mt-3 text-sm text-muted">
+              This batch used your pack. Email us with your order ID and we&apos;ll make it
+              right — a free retry or a refund.
+            </p>
+            <a
+              href={`mailto:support@getmodo.pro?subject=${encodeURIComponent(
+                `Failed batch ${id}`,
+              )}&body=${encodeURIComponent(
+                `My headshot batch (order ${id}) failed.\nError: ${order.error ?? "unknown"}`,
+              )}`}
+              className="mt-4 inline-block rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-paper transition-colors hover:bg-ink-raised"
+            >
+              Contact support
+            </a>
           </div>
         )}
 
@@ -161,38 +180,22 @@ export function OrderView({ id }: { id: string }) {
                 </h2>
               </div>
               <p className="text-xs text-muted">
-                {order.shots.length} generated · top {delivered.length} selected & upscaled to 2K ·
-                est. ${(((order.trainSeconds ?? 0) + order.genSeconds) * H100_PER_SEC).toFixed(2)}
+                {order.shots.length} generated · top {delivered.length} selected & upscaled to 2K
               </p>
             </div>
 
-            <Gallery shots={delivered} showScore />
+            <Gallery shots={delivered} />
 
             {alsoPassed.length > 0 && (
               <details className="rounded-card border border-line bg-paper-raised p-5">
                 <summary className="cursor-pointer text-sm font-semibold text-muted">
-                  {alsoPassed.length} more passed the identity gate (not in your top {delivered.length})
+                  {alsoPassed.length} more that look like you (outside your top {delivered.length})
                 </summary>
                 <p className="mt-2 text-xs text-muted">
-                  These look like you too, but ranked below your selected set on quality.
+                  Great matches too — they just ranked a little below your selected set.
                 </p>
                 <div className="mt-4">
-                  <Gallery shots={alsoPassed} showScore />
-                </div>
-              </details>
-            )}
-
-            {rejected.length > 0 && (
-              <details className="rounded-card border border-line bg-paper-raised p-5">
-                <summary className="cursor-pointer text-sm font-semibold text-muted">
-                  {rejected.length} rejected by the identity gate (sim &lt; {GATE})
-                </summary>
-                <p className="mt-2 text-xs text-muted">
-                  These drifted too far from your face, so we don&apos;t deliver them — this is the
-                  quality floor working.
-                </p>
-                <div className="mt-4 opacity-60">
-                  <Gallery shots={rejected} showScore dim />
+                  <Gallery shots={alsoPassed} />
                 </div>
               </details>
             )}
@@ -238,7 +241,7 @@ function ProgressLine({ order }: { order: Order }) {
   return null;
 }
 
-function Gallery({ shots, showScore, dim }: { shots: Shot[]; showScore?: boolean; dim?: boolean }) {
+function Gallery({ shots }: { shots: Shot[] }) {
   if (shots.length === 0) {
     return <p className="text-sm text-muted">Nothing here yet.</p>;
   }
@@ -253,19 +256,9 @@ function Gallery({ shots, showScore, dim }: { shots: Shot[]; showScore?: boolean
             ) : (
               <div className="grid h-full w-full place-items-center text-xs text-muted">…</div>
             )}
-            {showScore && typeof s.similarity === "number" && (
-              <span
-                className={`absolute right-2 top-2 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                  s.pass ? "bg-ink/85 text-paper" : "bg-red-600/85 text-white"
-                }`}
-              >
-                {(s.similarity * 100).toFixed(0)}%
-              </span>
-            )}
           </div>
-          <figcaption className="flex items-center justify-between px-3 py-2 text-xs">
+          <figcaption className="px-3 py-2 text-xs">
             <span className="font-medium">{STYLES[s.style]?.label ?? s.style}</span>
-            {dim && <span className="text-muted">rejected</span>}
           </figcaption>
         </figure>
       ))}

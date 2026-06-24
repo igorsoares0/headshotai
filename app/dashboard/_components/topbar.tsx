@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MobileNav } from "./mobile-nav";
 
 export function Topbar({
   title,
@@ -9,11 +10,14 @@ export function Topbar({
 }) {
   return (
     <div className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b border-line bg-paper/85 px-5 backdrop-blur-md sm:px-8">
-      <div className="min-w-0">
-        <h1 className="truncate text-lg font-extrabold tracking-tight">{title}</h1>
-        {subtitle ? (
-          <p className="hidden truncate text-xs text-muted sm:block">{subtitle}</p>
-        ) : null}
+      <div className="flex min-w-0 items-center gap-2">
+        <MobileNav />
+        <div className="min-w-0">
+          <h1 className="truncate text-lg font-extrabold tracking-tight">{title}</h1>
+          {subtitle ? (
+            <p className="hidden truncate text-xs text-muted sm:block">{subtitle}</p>
+          ) : null}
+        </div>
       </div>
       <div className="flex items-center gap-2">
         <div className="hidden items-center gap-2 rounded-full border border-line bg-paper-raised px-3 py-2 text-sm text-muted md:flex">
