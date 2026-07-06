@@ -1,13 +1,12 @@
 "use server";
 
-import { rm } from "node:fs/promises";
-import { join } from "node:path";
 import * as z from "zod";
 import { revalidatePath } from "next/cache";
 import { signOut } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/dal";
 import { listOrders } from "@/lib/store";
+import { r2DeletePrefix } from "@/lib/r2";
 import type { FormState } from "@/lib/definitions";
 
 const NameSchema = z.object({
@@ -32,19 +31,19 @@ export async function updateName(_prev: FormState, formData: FormData): Promise<
 
 /**
  * Permanently delete the signed-in user's account: their orders, purchases,
- * verification tokens, the generated image files on disk, and the user row —
- * then sign out. Destructive and irreversible; the UI gates this behind a typed
+ * verification tokens, every image object in R2, and the user row — then sign
+ * out. Destructive and irreversible; the UI gates this behind a typed
  * confirmation.
  */
 export async function deleteAccount(): Promise<void> {
   const userId = await requireUserId();
 
-  // Best-effort: remove each order's generated images from public/generated/<id>.
+  // Best-effort: remove each order's objects from every R2 prefix.
   const orders = await listOrders(userId);
   await Promise.all(
-    orders.map((o) =>
-      rm(join(process.cwd(), "public", "generated", o.id), { recursive: true, force: true }).catch(
-        () => {},
+    orders.flatMap((o) =>
+      ["uploads", "datasets", "generated", "upscaled"].map((p) =>
+        r2DeletePrefix(`${p}/${o.id}/`).catch(() => {}),
       ),
     ),
   );

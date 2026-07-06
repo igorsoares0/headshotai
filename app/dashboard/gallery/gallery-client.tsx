@@ -62,7 +62,7 @@ export function GalleryClient({
               <div className="absolute inset-x-0 bottom-0 flex translate-y-full items-center justify-between gap-2 bg-gradient-to-t from-black/70 to-transparent p-3 transition-transform group-hover:translate-y-0">
                 <p className="truncate text-sm font-semibold text-white">{shot.styleLabel}</p>
                 <a
-                  href={shot.file}
+                  href={shot.downloadUrl}
                   download
                   className="shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:bg-paper"
                 >

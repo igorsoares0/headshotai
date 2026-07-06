@@ -1,10 +1,12 @@
 /**
  * Server-side view models — maps stored orders (lib/store) into the shapes the
- * dashboard screens render. Keeps fs access on the server; client components
- * receive these as plain-serializable props.
+ * dashboard screens render. This is where stored R2 object keys become
+ * presigned URLs; client components only ever receive signed, time-limited
+ * URLs as plain-serializable props.
  */
 import { listOrders, type Order } from "./store";
 import { STYLES, type StyleKey } from "./recipe";
+import { isR2Key, r2SignGet } from "./r2";
 
 const STATUS_LABEL: Record<Order["status"], string> = {
   training: "TRAINING",
@@ -67,7 +69,8 @@ export async function orderRows(userId: string): Promise<OrderRow[]> {
 export interface GalleryShot {
   id: string;
   orderId: string;
-  file: string;
+  file: string; // presigned display URL
+  downloadUrl: string; // presigned attachment URL (`download` attr is ignored cross-origin)
   styleLabel: string;
   styleKey: StyleKey;
   score: number; // 0-100
@@ -77,20 +80,44 @@ export async function galleryShots(userId: string): Promise<GalleryShot[]> {
   const out: GalleryShot[] = [];
   for (const o of await listOrders(userId)) {
     for (const s of o.shots) {
-      if (isDelivered(s) && s.file) {
-        out.push({
-          id: `${o.id}_${s.style}_${s.idx}`,
-          orderId: o.id,
-          file: s.upscaledFile ?? s.file, // serve the 2K version when ready
-
-          styleLabel: STYLES[s.style]?.label ?? s.style,
-          styleKey: s.style,
-          score: s.similarity != null ? Math.round(s.similarity * 100) : 0,
-        });
-      }
+      const key = s.upscaledFile ?? s.file; // serve the 2K version when ready
+      // pre-R2 dev orders hold `/generated/...` disk paths — skip them
+      if (!isDelivered(s) || !isR2Key(key)) continue;
+      out.push({
+        id: `${o.id}_${s.style}_${s.idx}`,
+        orderId: o.id,
+        file: await r2SignGet(key),
+        downloadUrl: await r2SignGet(key, { downloadName: `${s.style}_${s.idx}.jpg` }),
+        styleLabel: STYLES[s.style]?.label ?? s.style,
+        styleKey: s.style,
+        score: s.similarity != null ? Math.round(s.similarity * 100) : 0,
+      });
     }
   }
   return out;
+}
+
+/**
+ * Serialize an order for the client: stored R2 keys become presigned URLs
+ * (legacy disk paths → undefined, so the UI shows its missing-image
+ * placeholder). Returns a copy — the in-memory order may still be saved by the
+ * pipeline, and signed URLs must never reach saveOrder. Reference keys are
+ * internal and stripped.
+ */
+export async function toClientOrder(order: Order): Promise<Order> {
+  return {
+    ...order,
+    referenceUrls: [],
+    shots: await Promise.all(
+      order.shots.map(async (s) => ({
+        ...s,
+        url: undefined,
+        upscaledUrl: undefined,
+        file: isR2Key(s.file) ? await r2SignGet(s.file) : undefined,
+        upscaledFile: isR2Key(s.upscaledFile) ? await r2SignGet(s.upscaledFile) : undefined,
+      })),
+    ),
+  };
 }
 
 export async function dashboardStats(userId: string) {

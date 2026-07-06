@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { advanceOrder } from "@/lib/pipeline";
 import { getOrder } from "@/lib/store";
+import { toClientOrder } from "@/lib/view";
 
 export const runtime = "nodejs";
 
@@ -14,7 +15,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (order.userId !== session.user.id)
     return Response.json({ error: "Forbidden" }, { status: 403 });
 
-  // each poll advances the lifecycle one step (training → … → ready)
+  // each poll advances the lifecycle one step (training → … → ready);
+  // the response carries presigned image URLs, never raw R2 keys
   const advanced = await advanceOrder(order);
-  return Response.json(advanced);
+  return Response.json(await toClientOrder(advanced));
 }

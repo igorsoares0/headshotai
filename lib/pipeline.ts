@@ -11,8 +11,6 @@
  * checks status and fires the next step. Good enough for the MVP slice; a real
  * deployment would use Replicate webhooks instead of client polling.
  */
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import sharp from "sharp";
 import JSZip from "jszip";
 import {
@@ -37,8 +35,8 @@ import {
   getTraining,
   isTerminal,
   startTraining,
-  uploadFile,
 } from "./replicate";
+import { r2GetBuffer, r2Put, r2SignGet, REPLICATE_TTL } from "./r2";
 import { type Order, newOrderId, saveOrder } from "./store";
 import { prisma } from "./prisma";
 import { sendOrderReadyEmail } from "./email";
@@ -79,21 +77,31 @@ export async function startOrder(
 ): Promise<Order> {
   const processed = await Promise.all(files.map((f) => downscale(f.buffer)));
 
-  // build training zip
+  // id is generated first: the R2 keys and the training webhook both carry it
+  const id = newOrderId();
+
+  // build the training zip and store it in R2; Replicate gets a presigned URL
   const zip = new JSZip();
   processed.forEach((b, i) => zip.file(`${String(i).padStart(2, "0")}.jpg`, b));
   const zipBuf = await zip.generateAsync({ type: "nodebuffer" });
-  const zipUrl = await uploadFile(zipBuf, "train.zip", "application/zip");
+  const zipKey = `datasets/${id}/train.zip`;
+  await r2Put(zipKey, zipBuf, "application/zip");
 
-  // upload a few references for the identity gate
+  // store a few references for the identity gate. We persist R2 *keys* and sign
+  // at use time — gating runs long after any URL presigned here would be stale.
   const refs = processed.slice(0, REFERENCE_COUNT);
   const referenceUrls = await Promise.all(
-    refs.map((b, i) => uploadFile(b, `ref_${i}.jpg`, "image/jpeg")),
+    refs.map(async (b, i) => {
+      const key = `uploads/${id}/ref_${i}.jpg`;
+      await r2Put(key, b, "image/jpeg");
+      return key;
+    }),
   );
 
-  // id is generated first so the training webhook can carry it
-  const id = newOrderId();
-  const { id: trainingId, destination } = await startTraining(zipUrl, webhookUrl(id));
+  const { id: trainingId, destination } = await startTraining(
+    await r2SignGet(zipKey, { expiresIn: REPLICATE_TTL }),
+    webhookUrl(id),
+  );
 
   const order: Order = {
     id,
@@ -249,8 +257,8 @@ async function tickGenerating(order: Order): Promise<void> {
       const url = Array.isArray(pred.output) ? (pred.output[0] as string) : (pred.output as string);
       shot.url = url;
       shot.predictTime = pred.metrics?.predict_time;
-      shot.file = await downloadShot(order.id, `${shot.style}_${shot.idx}.jpg`, url);
-      shot.status = "succeeded"; // only mark done after the file is on disk
+      shot.file = await downloadShot(`generated/${order.id}/${shot.style}_${shot.idx}.jpg`, url);
+      shot.status = "succeeded"; // only mark done after the file is in R2
       await saveOrder(order);
     } else {
       shot.status = pred.status;
@@ -263,13 +271,19 @@ async function tickGenerating(order: Order): Promise<void> {
   // Compare each output against every reference selfie (max wins in gating), so
   // one bad reference angle can't wrongly fail a good shot. Fired per-reference
   // and saved incrementally so a mid-loop blip resumes instead of re-firing.
+  // Both sides are presigned from R2 here — the Replicate output URL and any
+  // URL signed at order creation could have expired by now.
   order.genSeconds = order.shots.reduce((a, s) => a + (s.predictTime ?? 0), 0);
   for (const shot of order.shots) {
-    if (shot.status !== "succeeded" || !shot.url) continue;
+    if (shot.status !== "succeeded" || !shot.file) continue;
     if (shot.matchIds && shot.matchIds.length === order.referenceUrls.length) continue;
     shot.matchIds ??= [];
     for (let i = shot.matchIds.length; i < order.referenceUrls.length; i++) {
-      const match = await createFaceMatch(order.referenceUrls[i], shot.url, webhookUrl(order.id));
+      const match = await createFaceMatch(
+        await r2SignGet(order.referenceUrls[i], { expiresIn: REPLICATE_TTL }),
+        await r2SignGet(shot.file, { expiresIn: REPLICATE_TTL }),
+        webhookUrl(order.id),
+      );
       shot.matchIds.push(match.id);
       await saveOrder(order);
     }
@@ -327,16 +341,19 @@ async function tickGating(order: Order): Promise<void> {
  * never blocks an otherwise-good delivery.
  */
 async function tickScoring(order: Order): Promise<void> {
-  const passers = order.shots.filter((s) => s.pass && s.file && s.url);
+  const passers = order.shots.filter((s) => s.pass && s.file);
 
-  // 1) fire aesthetic + safety predictions for each survivor (idempotent)
+  // 1) fire aesthetic + safety predictions for each survivor (idempotent).
+  // Scored from the R2 copy — the Replicate output URL may have expired.
   for (const shot of passers) {
     if (!shot.aestheticId) {
-      shot.aestheticId = (await createAesthetic(shot.url!, webhookUrl(order.id))).id;
+      const src = await r2SignGet(shot.file!, { expiresIn: REPLICATE_TTL });
+      shot.aestheticId = (await createAesthetic(src, webhookUrl(order.id))).id;
       await saveOrder(order);
     }
     if (!shot.safetyId) {
-      shot.safetyId = (await createNsfw(shot.url!, webhookUrl(order.id))).id;
+      const src = await r2SignGet(shot.file!, { expiresIn: REPLICATE_TTL });
+      shot.safetyId = (await createNsfw(src, webhookUrl(order.id))).id;
       await saveOrder(order);
     }
   }
@@ -361,9 +378,9 @@ async function tickScoring(order: Order): Promise<void> {
   const pending = passers.some((s) => s.aesthetic === undefined || s.nsfw === undefined);
   if (pending) return; // still scoring
 
-  // 3) compute a perceptual hash for each survivor (local, cached)
+  // 3) compute a perceptual hash for each survivor (cached, one R2 fetch each)
   for (const shot of passers) {
-    if (!shot.phash) shot.phash = await aHash(join(process.cwd(), "public", shot.file!));
+    if (!shot.phash) shot.phash = await aHash(await r2GetBuffer(shot.file!));
     await saveOrder(order);
   }
 
@@ -395,8 +412,8 @@ function rankScore(s: Order["shots"][number]): number {
 }
 
 /** 64-bit average hash (as a 64-char bit string) of an image, for dedupe. */
-async function aHash(path: string): Promise<string> {
-  const { data } = await sharp(path)
+async function aHash(image: Buffer): Promise<string> {
+  const { data } = await sharp(image)
     .greyscale()
     .resize(8, 8, { fit: "fill" })
     .raw()
@@ -418,10 +435,11 @@ function hamming(a: string, b: string): number {
 
 /**
  * Upscale + face-restore the delivered (top-N) images only — generating 1.4× and
- * upscaling all of them would burn money on shots we discard. We upload the local
- * file to Replicate (the original output URL may have expired by now) and run
- * Real-ESRGAN. A failed upscale falls back to the original so it never blocks
- * delivery. Idempotent: each shot's upscaleId/upscaledFile gate re-firing.
+ * upscaling all of them would burn money on shots we discard. Real-ESRGAN reads
+ * the source straight from a presigned R2 URL (the original Replicate output URL
+ * may have expired by now). A failed upscale falls back to the original so it
+ * never blocks delivery. Idempotent: each shot's upscaleId/upscaledFile gate
+ * re-firing.
  */
 async function tickUpscaling(order: Order): Promise<void> {
   const delivered = order.shots.filter((s) => s.delivered && s.file);
@@ -429,21 +447,23 @@ async function tickUpscaling(order: Order): Promise<void> {
   // 1) fire an upscale for any delivered shot that doesn't have one yet
   for (const shot of delivered) {
     if (shot.upscaleId) continue;
-    const buf = await readFile(join(process.cwd(), "public", shot.file!));
-    const srcUrl = await uploadFile(buf, `src_${shot.style}_${shot.idx}.jpg`, "image/jpeg");
+    const srcUrl = await r2SignGet(shot.file!, { expiresIn: REPLICATE_TTL });
     const pred = await createUpscale(srcUrl, webhookUrl(order.id));
     shot.upscaleId = pred.id;
     await saveOrder(order); // persist before the next create so we don't re-fire
   }
 
-  // 2) poll upscales; download the 2K file as each finishes
+  // 2) poll upscales; store the 2K file as each finishes
   for (const shot of delivered) {
     if (!shot.upscaleId || shot.upscaledFile) continue;
     const pred = await getPrediction(shot.upscaleId);
     if (pred.status === "succeeded") {
       const url = Array.isArray(pred.output) ? (pred.output[0] as string) : (pred.output as string);
       shot.upscaledUrl = url;
-      shot.upscaledFile = await downloadShot(order.id, `${shot.style}_${shot.idx}_2k.jpg`, url);
+      shot.upscaledFile = await downloadShot(
+        `upscaled/${order.id}/${shot.style}_${shot.idx}.jpg`,
+        url,
+      );
       await saveOrder(order);
     } else if (isTerminal(pred.status)) {
       shot.upscaledFile = shot.file; // failed → deliver the original, don't block
@@ -454,9 +474,8 @@ async function tickUpscaling(order: Order): Promise<void> {
   if (delivered.every((s) => s.upscaledFile)) order.status = "ready";
 }
 
-async function downloadShot(orderId: string, name: string, url: string): Promise<string> {
-  const dir = join(process.cwd(), "public", "generated", orderId);
-  await mkdir(dir, { recursive: true });
+/** Fetch a Replicate output URL (with retry) and persist it in R2 under `key`. */
+async function downloadShot(key: string, url: string): Promise<string> {
   let res: Response | undefined;
   for (let attempt = 0; attempt < 4; attempt++) {
     try {
@@ -467,8 +486,8 @@ async function downloadShot(orderId: string, name: string, url: string): Promise
     }
     await new Promise((r) => setTimeout(r, 2 ** attempt * 500));
   }
-  if (!res || !res.ok) throw new Error(`download failed: ${name}`);
+  if (!res || !res.ok) throw new Error(`download failed: ${key}`);
   const buf = Buffer.from(await res.arrayBuffer());
-  await writeFile(join(dir, name), buf);
-  return `/generated/${orderId}/${name}`;
+  await r2Put(key, buf, "image/jpeg");
+  return key;
 }

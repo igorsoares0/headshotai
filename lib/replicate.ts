@@ -93,20 +93,6 @@ function postJson(path: string, body: unknown): Promise<Response> {
   return rfetch(path, { method: "POST", headers: authHeaders(), body: JSON.stringify(body) });
 }
 
-/** Upload a file to Replicate's Files API; returns a servable URL. */
-export async function uploadFile(data: Buffer, filename: string, mime: string): Promise<string> {
-  const form = new FormData();
-  form.append("content", new Blob([new Uint8Array(data)], { type: mime }), filename);
-  const r = await rfetch("/files", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token()}` },
-    body: form,
-  });
-  if (!r.ok) throw new Error(`upload failed: ${r.status} ${await r.text()}`);
-  const json = await r.json();
-  return json.urls.get as string;
-}
-
 /** Ensure the destination model exists (idempotent). */
 export async function ensureModel(): Promise<string> {
   const full = `${MODEL_OWNER}/${MODEL_NAME}`;

@@ -24,8 +24,8 @@ export interface Shot {
   idx: number;
   seed: number;
   status: string; // generation prediction status
-  url?: string; // replicate output url (expires)
-  file?: string; // local path served under /generated/<orderId>/
+  url?: string; // replicate output url (expires; kept for provenance only)
+  file?: string; // R2 key (generated/<orderId>/…) — presigned at read time (lib/r2)
   predictTime?: number;
   matchIds?: string[]; // face-match prediction ids, one per reference (max wins)
   similarity?: number | null; // resolved gate score (best across references)
@@ -37,8 +37,8 @@ export interface Shot {
   phash?: string; // 64-char average-hash bit string for near-duplicate detection
   delivered?: boolean; // selected (top-N by combined score) for delivery to the user
   upscaleId?: string; // upscale prediction id (delivered shots only)
-  upscaledUrl?: string; // replicate upscaled output url (expires)
-  upscaledFile?: string; // local path to the 2K file; falls back to `file` on failure
+  upscaledUrl?: string; // replicate upscaled output url (expires; provenance only)
+  upscaledFile?: string; // R2 key of the 2K file (upscaled/<orderId>/…); falls back to `file` on failure
 }
 
 export interface Order {
@@ -53,7 +53,7 @@ export interface Order {
   trainingId: string;
   destination: string;
   trainedVersion?: string;
-  referenceUrls: string[];
+  referenceUrls: string[]; // R2 keys of the identity-gate reference selfies (uploads/<orderId>/…)
   photoCount: number;
   trainSeconds?: number;
   genSeconds: number;

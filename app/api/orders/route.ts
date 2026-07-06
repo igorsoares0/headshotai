@@ -5,6 +5,7 @@ import { startOrder, type UploadInput } from "@/lib/pipeline";
 import { describeSubject, GENDERS, MAX_LOOKS, STYLE_KEYS } from "@/lib/recipe";
 import { summarizeRejections, validateSelfies } from "@/lib/validate";
 import { listOrders } from "@/lib/store";
+import { toClientOrder } from "@/lib/view";
 import {
   consumePurchase,
   getActivePurchase,
@@ -12,12 +13,13 @@ import {
   releasePurchase,
 } from "@/lib/entitlement";
 
-export const runtime = "nodejs"; // needs fs + sharp
+export const runtime = "nodejs"; // needs sharp
 
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) return Response.json({ error: "Unauthorized" }, { status: 401 });
-  return Response.json(await listOrders(session.user.id));
+  const orders = await listOrders(session.user.id);
+  return Response.json(await Promise.all(orders.map(toClientOrder)));
 }
 
 export async function POST(request: NextRequest) {
