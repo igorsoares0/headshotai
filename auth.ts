@@ -27,14 +27,39 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const ok = await bcrypt.compare(password, user?.passwordHash ?? DUMMY_HASH);
         if (!user || !ok) return null;
 
-        return { id: user.id, name: user.name, email: user.email };
+        // pwc = the password-change stamp this session is minted against; the jwt
+        // callback later revokes the token if the DB value moves past it.
+        return {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          pwc: user.passwordChangedAt?.getTime() ?? 0,
+        };
       },
     }),
   ],
   callbacks: {
     ...authConfig.callbacks,
-    jwt({ token, user }) {
-      if (user) token.sub = user.id;
+    async jwt({ token, user }) {
+      if (user) {
+        // initial sign-in: stamp the id + the password-change marker
+        token.sub = user.id;
+        token.pwc = (user as { pwc?: number }).pwc ?? 0;
+        return token;
+      }
+      // subsequent requests: revoke the session if the account was deleted or its
+      // password changed after this token was issued (e.g. a reset elsewhere).
+      // Runs only in the Node auth() instance — the edge proxy uses authConfig,
+      // which has no DB access, so page-gating stays fast and data access re-checks.
+      if (token.sub) {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: token.sub },
+          select: { passwordChangedAt: true },
+        });
+        if (!dbUser) return null; // account gone → invalidate
+        const changedAt = dbUser.passwordChangedAt?.getTime() ?? 0;
+        if (changedAt > ((token.pwc as number | undefined) ?? 0)) return null; // password rotated
+      }
       return token;
     },
     session({ session, token }) {

@@ -25,11 +25,24 @@ export async function POST(request: Request) {
     const txn = event.data;
     const purchaseId = (txn.customData as { purchaseId?: string } | null)?.purchaseId;
     if (purchaseId) {
-      // Only promote a still-pending row; don't resurrect consumed/refunded ones.
-      await prisma.purchase.updateMany({
-        where: { id: purchaseId, status: "pending" },
-        data: { status: "completed", paddleTxnId: txn.id },
-      });
+      // customData.purchaseId and the checkout's priceId are both chosen client-side,
+      // so a caller could pair a cheap price with an expensive pack's purchase. Before
+      // granting entitlement, confirm the transaction actually paid for THIS purchase's
+      // price — otherwise a $25 payment could complete an 80-photo pack.
+      const purchase = await prisma.purchase.findUnique({ where: { id: purchaseId } });
+      const paidForPrice = txn.items.some((item) => item.price?.id === purchase?.priceId);
+
+      if (purchase && paidForPrice) {
+        // Only promote a still-pending row; don't resurrect consumed/refunded ones.
+        await prisma.purchase.updateMany({
+          where: { id: purchaseId, status: "pending" },
+          data: { status: "completed", paddleTxnId: txn.id },
+        });
+      } else {
+        console.error(
+          `[paddle webhook] price mismatch for purchase ${purchaseId} (txn ${txn.id}); not granting entitlement`,
+        );
+      }
     }
   }
 

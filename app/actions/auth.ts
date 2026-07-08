@@ -7,6 +7,7 @@ import { auth, signIn, signOut } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { issueToken, consumeToken } from "@/lib/tokens";
 import { sendVerificationEmail, sendPasswordResetEmail } from "@/lib/email";
+import { checkAuthRateLimit } from "@/lib/ratelimit";
 import {
   SignupFormSchema,
   ForgotFormSchema,
@@ -15,6 +16,10 @@ import {
 } from "@/lib/definitions";
 
 export async function signup(_prev: FormState, formData: FormData): Promise<FormState> {
+  // Throttle account creation per IP to blunt automated signup / email-abuse.
+  const limited = await checkAuthRateLimit("signup", { limit: 5, windowMs: 60 * 60 * 1000 });
+  if (limited) return { message: limited };
+
   const parsed = SignupFormSchema.safeParse({
     name: formData.get("name"),
     email: formData.get("email"),
@@ -50,6 +55,17 @@ export async function signup(_prev: FormState, formData: FormData): Promise<Form
 }
 
 export async function authenticate(_prev: FormState, formData: FormData): Promise<FormState> {
+  // Throttle login attempts. Scoped by IP+email so brute-forcing one account and
+  // spraying many accounts from one host both get capped, while normal typos don't
+  // lock a whole IP out too aggressively.
+  const email = String(formData.get("email") ?? "").toLowerCase();
+  const limited = await checkAuthRateLimit("login", {
+    limit: 10,
+    windowMs: 15 * 60 * 1000,
+    scope: email,
+  });
+  if (limited) return { message: limited };
+
   try {
     await signIn("credentials", {
       email: formData.get("email"),
@@ -79,6 +95,14 @@ export async function resendVerification(): Promise<{ ok: boolean }> {
   const session = await auth();
   if (!session?.user?.id) return { ok: false };
 
+  // Cap resends per user so this can't be used to spam a verified address.
+  const limited = await checkAuthRateLimit("resend-verify", {
+    limit: 3,
+    windowMs: 60 * 60 * 1000,
+    scope: session.user.id,
+  });
+  if (limited) return { ok: false };
+
   const user = await prisma.user.findUnique({ where: { id: session.user.id } });
   if (!user || user.emailVerified) return { ok: false };
 
@@ -100,6 +124,13 @@ export async function requestPasswordReset(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
+  // Throttle reset requests per IP to prevent password-reset email flooding. Keep
+  // the generic response so this never becomes an account-enumeration oracle.
+  const limited = await checkAuthRateLimit("reset-request", { limit: 5, windowMs: 60 * 60 * 1000 });
+  if (limited) {
+    return { message: "If an account exists for that email, we've sent a reset link." };
+  }
+
   const parsed = ForgotFormSchema.safeParse({ email: formData.get("email") });
   if (!parsed.success) {
     return { errors: z.flattenError(parsed.error).fieldErrors };
@@ -124,6 +155,11 @@ export async function resetPassword(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
+  // Cap token submissions per IP — tokens are 256-bit random so guessing is already
+  // infeasible, but this stops any automated hammering of the endpoint.
+  const limited = await checkAuthRateLimit("reset-submit", { limit: 10, windowMs: 15 * 60 * 1000 });
+  if (limited) return { message: limited };
+
   const parsed = ResetFormSchema.safeParse({
     token: formData.get("token"),
     password: formData.get("password"),
@@ -138,7 +174,13 @@ export async function resetPassword(
   }
 
   const passwordHash = await bcrypt.hash(parsed.data.password, 10);
-  await prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+  // Stamp passwordChangedAt so any JWT session issued before now is revoked on its
+  // next request (see the jwt callback in auth.ts) — a reset must log out sessions
+  // an attacker may already hold.
+  await prisma.user.update({
+    where: { id: userId },
+    data: { passwordHash, passwordChangedAt: new Date() },
+  });
 
   return { message: "ok" };
 }

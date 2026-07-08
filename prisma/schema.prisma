@@ -17,6 +17,10 @@ model User {
   email         String    @unique
   passwordHash  String
   emailVerified DateTime? // null = email not confirmed; gates the paid action
+  // Bumped on every password change. The JWT carries the value it was minted
+  // with; the `jwt` callback revokes any token issued before this — so a reset
+  // logs out sessions that predate it (JWTs are otherwise unrevocable).
+  passwordChangedAt DateTime?
   createdAt     DateTime  @default(now())
 }
 
