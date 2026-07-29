@@ -6,17 +6,53 @@ import { AuthError } from "next-auth";
 import { auth, signIn, signOut } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { issueToken, consumeToken } from "@/lib/tokens";
-import { sendVerificationEmail, sendPasswordResetEmail } from "@/lib/email";
+import {
+  sendVerificationEmail,
+  sendPasswordResetEmail,
+  sendExistingAccountEmail,
+} from "@/lib/email";
 import { checkAuthRateLimit } from "@/lib/ratelimit";
 import {
   SignupFormSchema,
   ForgotFormSchema,
   ResetFormSchema,
+  ChangePasswordFormSchema,
   type FormState,
 } from "@/lib/definitions";
 
+/**
+ * Floor for the signup response, in ms. Measured locally, creating an account
+ * took ~2.3s (bcrypt + insert + token transaction + email) while the
+ * already-exists branch returned in ~0.7s. Identical HTML is not enough when the
+ * clock gives the answer away, so both branches are held to this budget. Raise it
+ * if account creation ever routinely exceeds it.
+ */
+const SIGNUP_RESPONSE_MS = 2500;
+
+/** Hold until `ms` has elapsed since `startedAt`, so a branch can't finish early. */
+async function padTo(startedAt: number, ms: number): Promise<void> {
+  const remaining = ms - (Date.now() - startedAt);
+  if (remaining > 0) await new Promise((r) => setTimeout(r, remaining));
+}
+
+/**
+ * Create an account — or, if the address already has one, say nothing about it.
+ *
+ * Both branches send an email and return the identical `{ message: "ok" }`, which
+ * the form renders as "check your email". That symmetry is the whole point: a
+ * distinguishable response here (the old "an account already exists", or an
+ * auto-login that only happens for new addresses) lets anyone test an email
+ * address for membership one submission at a time.
+ *
+ * The cost is that signup no longer signs you straight in — verification-first is
+ * what makes the two paths look the same from outside.
+ */
 export async function signup(_prev: FormState, formData: FormData): Promise<FormState> {
+  const startedAt = Date.now();
+
   // Throttle account creation per IP to blunt automated signup / email-abuse.
+  // Not padded: rate-limit and validation replies are decided by what the caller
+  // submitted, so they reveal nothing about whether the address has an account.
   const limited = await checkAuthRateLimit("signup", { limit: 5, windowMs: 60 * 60 * 1000 });
   if (limited) return { message: limited };
 
@@ -31,27 +67,37 @@ export async function signup(_prev: FormState, formData: FormData): Promise<Form
 
   const { name, email, password } = parsed.data;
 
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) {
-    return { message: "An account with this email already exists." };
-  }
-
+  // Hash before looking the address up, so both branches pay the ~100ms bcrypt
+  // cost. Skipping it on the "already exists" path would answer noticeably faster
+  // and hand back the very signal the wording below is hiding.
   const passwordHash = await bcrypt.hash(password, 10);
-  const user = await prisma.user.create({ data: { name, email, passwordHash } });
 
-  // Email starts unverified; send the confirmation link but don't block signup if
-  // the email provider hiccups — they can resend later. The paid action is gated
-  // on emailVerified, so an unverified account can't spend anything.
-  try {
-    const token = await issueToken(user.id, "verify_email");
-    await sendVerificationEmail(email, token);
-  } catch (e) {
-    console.error("verification email failed:", e);
+  const existing = await prisma.user.findUnique({ where: { email } });
+
+  if (existing) {
+    // The address owner gets told; the form does not.
+    await sendExistingAccountEmail(email).catch((e) =>
+      console.error("existing-account email failed:", e),
+    );
+  } else {
+    try {
+      const user = await prisma.user.create({ data: { name, email, passwordHash } });
+      // Email starts unverified. The paid action is gated on emailVerified, so an
+      // unverified account can't spend anything.
+      const token = await issueToken(user.id, "verify_email");
+      await sendVerificationEmail(email, token);
+    } catch (e) {
+      // Covers a flaky email provider (they can resend after signing in) and the
+      // unique-constraint race of two simultaneous signups for one address. Both
+      // still fall through to the generic response — surfacing an error page for
+      // one branch only would be an enumeration oracle of its own.
+      console.error("signup failed:", e);
+    }
   }
 
-  // Throws a redirect (to /dashboard) on success — must propagate, not be caught.
-  await signIn("credentials", { email, password, redirectTo: "/dashboard" });
-  return undefined;
+  // Same words, same length of silence.
+  await padTo(startedAt, SIGNUP_RESPONSE_MS);
+  return { message: "ok" };
 }
 
 export async function authenticate(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -181,6 +227,77 @@ export async function resetPassword(
     where: { id: userId },
     data: { passwordHash, passwordChangedAt: new Date() },
   });
+
+  return { message: "ok" };
+}
+
+/**
+ * Change the password of the signed-in user. Requires the current password: a
+ * session alone must not be enough to take an account over, since a session can
+ * be borrowed (shared machine, stolen cookie) while the password cannot.
+ *
+ * Like a reset, this stamps `passwordChangedAt`, which revokes every JWT minted
+ * before now — the point of changing a password is to evict whoever else might
+ * be holding one. That includes the caller's own token, so we immediately mint a
+ * fresh session from the new password to keep them signed in here.
+ */
+export async function changePassword(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const session = await auth();
+  if (!session?.user?.id) return { message: "You've been signed out. Sign in and try again." };
+
+  // Per-user throttle: this endpoint accepts the current password, so it is a
+  // brute-force target for anyone who gets hold of a session.
+  const limited = await checkAuthRateLimit("change-password", {
+    limit: 5,
+    windowMs: 15 * 60 * 1000,
+    scope: session.user.id,
+  });
+  if (limited) return { message: limited };
+
+  const parsed = ChangePasswordFormSchema.safeParse({
+    currentPassword: formData.get("currentPassword"),
+    password: formData.get("password"),
+  });
+  if (!parsed.success) {
+    return { errors: z.flattenError(parsed.error).fieldErrors };
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+  if (!user) return { message: "You've been signed out. Sign in and try again." };
+
+  if (!(await bcrypt.compare(parsed.data.currentPassword, user.passwordHash))) {
+    return { errors: { currentPassword: ["That isn't your current password."] } };
+  }
+  if (await bcrypt.compare(parsed.data.password, user.passwordHash)) {
+    return { errors: { password: ["That's already your password. Pick a different one."] } };
+  }
+
+  const passwordHash = await bcrypt.hash(parsed.data.password, 10);
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { passwordHash, passwordChangedAt: new Date() },
+  });
+
+  try {
+    // Fresh token, stamped with the new passwordChangedAt. Every OTHER session is
+    // now revoked on its next request; this one survives.
+    await signIn("credentials", {
+      email: user.email,
+      password: parsed.data.password,
+      redirect: false,
+    });
+  } catch (e) {
+    // A redirect thrown by signIn must propagate, never be swallowed as an error.
+    if (e instanceof Error && String((e as { digest?: string }).digest).startsWith("NEXT_REDIRECT")) {
+      throw e;
+    }
+    // The password change itself already committed. Worst case this session is
+    // revoked on the next request and they sign in again with the new password.
+    console.error("re-signin after password change failed:", e);
+  }
 
   return { message: "ok" };
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { initializePaddle, type Paddle } from "@paddle/paddle-js";
 import { createCheckout } from "@/app/actions/billing";
 import type { Pack } from "@/lib/packs";
@@ -95,6 +96,21 @@ export function BillingClient({ packs }: { packs: Pack[] }) {
           </div>
         ))}
       </div>
+
+      {/* Point-of-sale disclosure: who you're actually paying, and the refund
+          terms — both expected of a merchant-of-record checkout. */}
+      <p className="mt-8 max-w-2xl text-xs leading-relaxed text-muted">
+        Payments are processed by Paddle, our merchant of record. Taxes are calculated at
+        checkout. An unused pack is fully refundable — see our{" "}
+        <Link href="/refunds" className="text-electric hover:underline">
+          Refund Policy
+        </Link>{" "}
+        and{" "}
+        <Link href="/terms" className="text-electric hover:underline">
+          Terms of Service
+        </Link>
+        .
+      </p>
     </div>
   );
 }

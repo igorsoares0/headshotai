@@ -4,7 +4,16 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Topbar } from "@/app/dashboard/_components/topbar";
-import { GENDERS, ETHNICITIES, STYLES, STYLE_KEYS, MAX_LOOKS } from "@/lib/recipe";
+import {
+  GENDERS,
+  ETHNICITIES,
+  STYLES,
+  STYLE_KEYS,
+  MAX_LOOKS,
+  MAX_UPLOADS,
+  MAX_UPLOAD_BYTES,
+  MIN_UPLOADS,
+} from "@/lib/recipe";
 
 // A varied default selection so the user isn't forced to pick before starting.
 const DEFAULT_LOOKS = ["gray_navysuit", "white_blazer", "office_shirt", "park_shirt"].filter((k) =>
@@ -13,8 +22,9 @@ const DEFAULT_LOOKS = ["gray_navysuit", "white_blazer", "office_shirt", "park_sh
 
 // Client-side upload guards — catch bad photos *before* we burn a training run on
 // them. Mirrors the copy in the requirements checklist below.
-const MAX_FILES = 25;
-const MAX_BYTES = 15 * 1024 * 1024; // 15MB
+// Counts/sizes come from lib/recipe so the picker and POST /api/orders can't drift.
+const MAX_FILES = MAX_UPLOADS;
+const MAX_BYTES = MAX_UPLOAD_BYTES;
 const MIN_DIM = 1024; // px on the longer edge
 
 async function imageDims(file: File): Promise<{ w: number; h: number } | null> {
@@ -187,7 +197,10 @@ export function NewClient({ pack }: { pack: { name: string; photoCount: number }
                 </svg>
               </div>
               <p className="mt-4 text-sm font-semibold">Drag &amp; drop or click to upload</p>
-              <p className="mt-1 text-xs text-muted">JPG, JPEG or PNG · up to 15MB each · 10–25 photos</p>
+              <p className="mt-1 text-xs text-muted">
+                JPG, JPEG or PNG · up to {Math.round(MAX_BYTES / (1024 * 1024))}MB each ·{" "}
+                {MIN_UPLOADS}–{MAX_FILES} photos
+              </p>
             </label>
 
             {notice && (
@@ -335,7 +348,7 @@ export function NewClient({ pack }: { pack: { name: string; photoCount: number }
           )}
 
           <button
-            disabled={files.length < 10 || !gender || looks.length === 0 || submitting}
+            disabled={files.length < MIN_UPLOADS || !gender || looks.length === 0 || submitting}
             onClick={submit}
             className="w-full rounded-full bg-electric px-5 py-3.5 text-sm font-semibold text-white transition active:scale-[0.97] hover:bg-electric-dim disabled:cursor-not-allowed disabled:opacity-40"
           >
@@ -343,8 +356,8 @@ export function NewClient({ pack }: { pack: { name: string; photoCount: number }
               ? progress < 100
                 ? `Uploading… ${progress}%`
                 : "Starting…"
-              : files.length < 10
-                ? `Add ${10 - files.length} more photos`
+              : files.length < MIN_UPLOADS
+                ? `Add ${MIN_UPLOADS - files.length} more photos`
                 : !gender
                   ? "Select who these photos are of"
                   : looks.length === 0
@@ -360,6 +373,22 @@ export function NewClient({ pack }: { pack: { name: string; photoCount: number }
               />
             </div>
           )}
+          {/* This is the moment consent is actually given: training runs facial
+              analysis on the uploads, and starting the batch spends the pack —
+              the two things the privacy and refund policies hang on. */}
+          <p className="text-xs leading-relaxed text-muted">
+            By starting, you confirm these are photos of you (or of an adult who agreed to
+            this), and you consent to us analysing your face to build your model — see the{" "}
+            <Link href="/privacy#sensitive" className="text-electric hover:underline">
+              Privacy Policy
+            </Link>
+            . Training begins immediately and uses your pack, so the{" "}
+            <Link href="/refunds#started" className="text-electric hover:underline">
+              14-day withdrawal right
+            </Link>{" "}
+            ends here.
+          </p>
+
           <Link href="/dashboard" className="block text-center text-sm font-medium text-muted hover:text-ink">
             Cancel
           </Link>

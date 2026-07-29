@@ -30,14 +30,17 @@ export default async function VerifyPage({
           </h1>
           <p className="mt-3 text-sm text-muted">
             {ok
-              ? "Your email is confirmed — you can now generate headshots."
+              ? "Your email is confirmed. Sign in to start generating headshots."
               : "This verification link is no longer valid. Sign in and request a new one."}
           </p>
+          {/* Signup no longer logs you in, so most people land here signed out.
+              /dashboard bounces them to sign-in and back, and anyone already
+              signed in goes straight through. */}
           <Link
             href="/dashboard"
             className="mt-6 inline-block rounded-full bg-electric px-5 py-3 text-sm font-semibold text-white transition active:scale-[0.97] hover:bg-electric-dim"
           >
-            Go to dashboard
+            {ok ? "Continue" : "Go to dashboard"}
           </Link>
         </div>
       </div>

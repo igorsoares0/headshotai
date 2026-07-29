@@ -28,9 +28,25 @@ export const ResetFormSchema = z.object({
     .trim(),
 });
 
+// Changing a password while signed in — unlike the reset flow, this one has to
+// prove you know the current password, since a hijacked session must not be
+// enough to lock the real owner out.
+export const ChangePasswordFormSchema = z.object({
+  currentPassword: z.string().min(1, { error: "Enter your current password." }),
+  password: z
+    .string()
+    .min(8, { error: "Password must be at least 8 characters." })
+    .trim(),
+});
+
 export type FormState =
   | {
-      errors?: { name?: string[]; email?: string[]; password?: string[] };
+      errors?: {
+        name?: string[];
+        email?: string[];
+        password?: string[];
+        currentPassword?: string[];
+      };
       message?: string;
     }
   | undefined;

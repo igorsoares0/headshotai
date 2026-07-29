@@ -131,3 +131,75 @@ select:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   .animate-marquee, .rise, .progress-shimmer { animation: none; opacity: 1; }
 }
+
+/* Long-form document body (terms, privacy, refunds). Legal text is read by
+   people who are already unhappy or already suspicious — so: real measure,
+   generous leading, headings that survive skimming. */
+.legal-prose {
+  max-width: 68ch;
+  font-size: 0.9375rem;
+  line-height: 1.75;
+  color: var(--color-muted);
+}
+.legal-prose h2 {
+  margin-top: 3rem;
+  margin-bottom: 0.875rem;
+  font-size: 1.375rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--color-ink);
+  scroll-margin-top: 5.5rem; /* clears the sticky nav on #anchor jumps */
+}
+.legal-prose h3 {
+  margin-top: 1.75rem;
+  margin-bottom: 0.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+.legal-prose p,
+.legal-prose ul,
+.legal-prose ol {
+  margin-bottom: 1rem;
+}
+.legal-prose ul,
+.legal-prose ol {
+  padding-left: 1.25rem;
+}
+.legal-prose ul { list-style: disc; }
+.legal-prose ol { list-style: decimal; }
+.legal-prose li { margin-bottom: 0.4rem; }
+.legal-prose strong { color: var(--color-ink); font-weight: 650; }
+.legal-prose a {
+  color: var(--color-electric);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.legal-prose a:hover { color: var(--color-electric-dim); }
+.legal-prose table {
+  width: 100%;
+  margin-bottom: 1.25rem;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+.legal-prose th,
+.legal-prose td {
+  border: 1px solid var(--color-line);
+  padding: 0.6rem 0.75rem;
+  text-align: left;
+  vertical-align: top;
+}
+.legal-prose th {
+  background: var(--color-paper-sunken);
+  font-weight: 650;
+  color: var(--color-ink);
+}
+/* Callout for the things a reader must not miss. */
+.legal-prose .callout {
+  margin: 1.5rem 0;
+  border-left: 3px solid var(--color-electric);
+  background: var(--color-paper-raised);
+  padding: 1rem 1.25rem;
+  border-radius: 0 var(--radius-card) var(--radius-card) 0;
+}
+.legal-prose .callout p:last-child { margin-bottom: 0; }

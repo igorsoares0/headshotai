@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Topbar } from "@/app/dashboard/_components/topbar";
 import { AccountForm } from "./account-form";
+import { PasswordForm } from "./password-form";
 import { DangerZone } from "./danger-zone";
 import { getUser } from "@/lib/dal";
 import { getActivePurchase } from "@/lib/entitlement";
@@ -46,6 +47,8 @@ export default async function ProfilePage() {
             email={user.email}
             verified={!!user.emailVerified}
           />
+
+          <PasswordForm />
         </div>
 
         {/* identity model */}

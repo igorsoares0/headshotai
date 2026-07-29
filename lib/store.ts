@@ -121,6 +121,21 @@ export async function listOrders(userId?: string): Promise<Order[]> {
   return rows.map(toOrder);
 }
 
+/**
+ * Every order still mid-flight, oldest first — what the cron sweeps so a batch
+ * finishes (and its ready-email sends) whether or not the customer keeps the tab
+ * open. Ordered oldest-first so the orders closest to done get the budget when a
+ * run is capped.
+ */
+export async function listActiveOrders(limit: number): Promise<Order[]> {
+  const rows = await prisma.order.findMany({
+    where: { status: { notIn: ["ready", "failed"] } },
+    orderBy: { createdAt: "asc" },
+    take: limit,
+  });
+  return rows.map(toOrder);
+}
+
 export async function saveOrder(order: Order): Promise<void> {
   const data = toRow(order);
   await prisma.order.upsert({

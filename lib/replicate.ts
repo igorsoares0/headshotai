@@ -141,6 +141,50 @@ export async function getTraining(id: string): Promise<Training> {
   return (await r.json()) as Training;
 }
 
+/**
+ * Delete one trained LoRA version — and, per Replicate, every prediction and
+ * output file produced with it. This is the third copy of a user's likeness
+ * (after our database and our R2 bucket), so account deletion has to reach it
+ * for the promise in the privacy policy to be true.
+ *
+ * Replicate only permits this for versions of a *private* model you own that
+ * nobody else has run predictions against. `ensureModel` creates the destination
+ * with `visibility: "private"`, so per-order versions qualify. Deletion is
+ * accepted asynchronously (202) and completes in the background.
+ *
+ * Returns false instead of throwing: a deletion sweep must not abort halfway
+ * because one version is unreachable. Callers should log what didn't go.
+ */
+export async function deleteModelVersion(model: string, versionId: string): Promise<boolean> {
+  const r = await rfetch(`/models/${model}/versions/${versionId}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (r.ok) return true; // 202 Accepted — queued for deletion
+  if (r.status === 404) return true; // already gone; nothing to do
+  console.error(
+    `[replicate] delete version ${model}:${versionId} → ${r.status} ${await r.text()}`,
+  );
+  return false;
+}
+
+/**
+ * Split a stored `trainedVersion` ("owner/name:hash") into the model path and
+ * version id. Returns null for the legacy/partial values that predate a
+ * successful training, so callers can skip them.
+ */
+export function splitVersion(
+  trainedVersion: string | undefined,
+  fallbackModel?: string,
+): { model: string; versionId: string } | null {
+  if (!trainedVersion) return null;
+  const idx = trainedVersion.lastIndexOf(":");
+  const versionId = idx === -1 ? trainedVersion : trainedVersion.slice(idx + 1);
+  const model = idx === -1 ? fallbackModel : trainedVersion.slice(0, idx);
+  if (!model || !versionId) return null;
+  return { model, versionId };
+}
+
 /** Create a generation prediction (non-blocking). */
 export async function createGeneration(
   versionHash: string,

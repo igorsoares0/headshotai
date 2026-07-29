@@ -18,6 +18,31 @@ export default function SignupPage() {
           <span className="text-lg font-extrabold tracking-tight">aperture</span>
         </Link>
 
+        {/* Deliberately identical whether or not the address already had an
+            account — see the comment on the signup action. Nothing here may hint
+            at which of the two happened. */}
+        {state?.message === "ok" ? (
+          <>
+            <div className="rounded-card border border-line bg-paper-raised p-7 text-center">
+              <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-electric/10 text-electric">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="2.5" y="4.5" width="19" height="15" rx="2.5" />
+                  <path d="m3 7 9 6 9-6" />
+                </svg>
+              </span>
+              <h1 className="mt-4 text-2xl font-extrabold tracking-tight">Check your email</h1>
+              <p className="mt-3 text-sm leading-relaxed text-muted">
+                We&apos;ve sent a link to your address. Open it to finish setting up and
+                sign in. If nothing arrives in a few minutes, check your spam folder.
+              </p>
+            </div>
+            <p className="mt-6 text-center text-sm text-muted">
+              <Link href="/login" className="font-semibold text-electric hover:underline">
+                Back to sign in
+              </Link>
+            </p>
+          </>
+        ) : (
         <div className="rounded-card border border-line bg-paper-raised p-7">
           <p className="kicker text-muted">Get started</p>
           <h1 className="mt-1 text-2xl font-extrabold tracking-tight">Create account</h1>
@@ -91,7 +116,7 @@ export default function SignupPage() {
               ) : null}
             </div>
 
-            {state?.message ? (
+            {state?.message && state.message !== "ok" ? (
               <p className="rounded-xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">
                 {state.message}
               </p>
@@ -104,15 +129,30 @@ export default function SignupPage() {
             >
               {pending ? "Creating account…" : "Create account"}
             </button>
+
+            <p className="text-center text-xs leading-relaxed text-muted">
+              By creating an account you agree to our{" "}
+              <Link href="/terms" className="text-electric hover:underline">
+                Terms of Service
+              </Link>{" "}
+              and{" "}
+              <Link href="/privacy" className="text-electric hover:underline">
+                Privacy Policy
+              </Link>
+              .
+            </p>
           </form>
         </div>
+        )}
 
-        <p className="mt-6 text-center text-sm text-muted">
-          Already have an account?{" "}
-          <Link href="/login" className="font-semibold text-electric hover:underline">
-            Sign in
-          </Link>
-        </p>
+        {state?.message !== "ok" ? (
+          <p className="mt-6 text-center text-sm text-muted">
+            Already have an account?{" "}
+            <Link href="/login" className="font-semibold text-electric hover:underline">
+              Sign in
+            </Link>
+          </p>
+        ) : null}
       </div>
     </main>
   );

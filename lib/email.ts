@@ -27,8 +27,13 @@ export function appBaseUrl(): string {
 async function send(to: string, subject: string, html: string): Promise<void> {
   const { error } = await resend().emails.send(
     { from: FROM, to, subject, html },
-    // Same link => same key => safe retry; a new link => new key => no 409.
-    { idempotencyKey: `auth/${createHash("sha256").update(html).digest("hex").slice(0, 32)}` },
+    // Same recipient + same body => same key => safe retry; a new link => new key
+    // => no 409. The recipient MUST be in the hash: emails whose body carries no
+    // per-user token (see sendExistingAccountEmail) would otherwise collide across
+    // users, and the second recipient's mail would be dropped as a duplicate.
+    {
+      idempotencyKey: `auth/${createHash("sha256").update(`${to}\n${html}`).digest("hex").slice(0, 32)}`,
+    },
   );
   if (error) throw new Error(`Email send failed: ${error.message}`);
 }
@@ -72,6 +77,27 @@ export async function sendOrderReadyEmail(
       "Your headshots are ready 🎉",
       `${hi} batch is done — ${count} professional headshot${count === 1 ? "" : "s"} are ready to view and download.`,
       "View my headshots",
+      href,
+    ),
+  );
+}
+
+/**
+ * Sent when someone tries to sign up with an address that already has an account.
+ * This email is what lets the signup form answer identically either way: the
+ * "an account already exists" fact goes to the inbox that owns the address, not
+ * to whoever typed it into the form.
+ */
+export async function sendExistingAccountEmail(to: string): Promise<void> {
+  const href = `${appBaseUrl()}/login`;
+  await send(
+    to,
+    "You already have an account",
+    shell(
+      "You already have an account",
+      "Someone just tried to sign up with this email address. An account already exists for it, so we didn't create a second one and nothing has changed." +
+        "<br><br>If that was you, sign in below — and use &ldquo;Forgot password&rdquo; on that page if you can't remember your password. If it wasn't you, you can safely ignore this email.",
+      "Sign in",
       href,
     ),
   );

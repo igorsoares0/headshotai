@@ -1,10 +1,15 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 
-/** The user's first paid, unconsumed purchase — their right to start one batch. */
+/**
+ * The user's first paid, unconsumed purchase — their right to start one batch.
+ * A refund/chargeback moves the row to `refunded` (see the Paddle webhook); the
+ * `refundedAt` clause is belt-and-suspenders so a row that somehow kept
+ * `completed` while carrying a refund stamp still can't be spent.
+ */
 export async function getActivePurchase(userId: string) {
   return prisma.purchase.findFirst({
-    where: { userId, status: "completed" },
+    where: { userId, status: "completed", refundedAt: null },
     orderBy: { createdAt: "asc" },
   });
 }
@@ -17,7 +22,9 @@ export async function getActivePurchase(userId: string) {
  */
 export async function consumePurchase(purchaseId: string): Promise<boolean> {
   const res = await prisma.purchase.updateMany({
-    where: { id: purchaseId, status: "completed" },
+    // Re-checks refundedAt: a refund webhook can land between the read in
+    // getActivePurchase and this reservation.
+    where: { id: purchaseId, status: "completed", refundedAt: null },
     data: { status: "consumed" },
   });
   return res.count === 1;

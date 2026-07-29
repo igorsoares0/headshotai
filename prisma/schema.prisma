@@ -73,9 +73,15 @@ model Purchase {
   packId      String // starter | pro | premium
   photoCount  Int
   priceId     String
-  status      String   @default("pending") // pending | completed | consumed
+  status      String   @default("pending") // pending | completed | consumed | refunded
   paddleTxnId String?  @unique // Paddle transaction id — dedupes webhook replays
   orderId     String? // set when consumed by an order
+  // Set when Paddle reports a refund/chargeback for this transaction. An
+  // unspent purchase also moves to status `refunded` (entitlement revoked); a
+  // purchase already `consumed` keeps that status — the order it paid for
+  // exists and the photos were delivered — and this stamp is the flag for
+  // manual follow-up. Cleared if the adjustment is later rejected.
+  refundedAt  DateTime?
   createdAt   DateTime @default(now())
 
   @@index([userId, status])

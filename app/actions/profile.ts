@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/dal";
 import { listOrders } from "@/lib/store";
 import { r2DeletePrefix } from "@/lib/r2";
+import { deleteModelVersion, splitVersion } from "@/lib/replicate";
 import type { FormState } from "@/lib/definitions";
 
 const NameSchema = z.object({
@@ -31,9 +32,14 @@ export async function updateName(_prev: FormState, formData: FormData): Promise<
 
 /**
  * Permanently delete the signed-in user's account: their orders, purchases,
- * verification tokens, every image object in R2, and the user row — then sign
- * out. Destructive and irreversible; the UI gates this behind a typed
- * confirmation.
+ * verification tokens, every image object in R2, the trained likeness models at
+ * Replicate, and the user row — then sign out. Destructive and irreversible;
+ * the UI gates this behind a typed confirmation.
+ *
+ * Order matters: everything external goes BEFORE the database transaction. The
+ * order rows are the only record of which Replicate version and which R2 prefix
+ * belong to this user, so dropping them first would orphan whatever failed to
+ * delete, with nothing left to retry from.
  */
 export async function deleteAccount(): Promise<void> {
   const userId = await requireUserId();
@@ -46,6 +52,24 @@ export async function deleteAccount(): Promise<void> {
         r2DeletePrefix(`${p}/${o.id}/`).catch(() => {}),
       ),
     ),
+  );
+
+  // The likeness models themselves — the third copy of this person's face,
+  // after the database rows and the image files. Deleting the version also
+  // removes the predictions and outputs Replicate holds for it.
+  await Promise.all(
+    orders.map(async (o) => {
+      const v = splitVersion(o.trainedVersion, o.destination);
+      if (!v) return; // training never produced a version — nothing to delete
+      const ok = await deleteModelVersion(v.model, v.versionId).catch(() => false);
+      if (!ok) {
+        // Loud, and with the ids: after the transaction below these are the only
+        // surviving trace of a model that should no longer exist.
+        console.error(
+          `[account deletion] ORPHANED likeness model ${v.model}:${v.versionId} (order ${o.id}, user ${userId}) — delete it manually`,
+        );
+      }
+    }),
   );
 
   await prisma.$transaction([

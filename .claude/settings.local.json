@@ -12,7 +12,14 @@
       "Bash(curl -s http://localhost:3055/api/orders)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3055/api/orders/nope)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3055/dashboard/orders/nope)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(npx tsc *)",
+      "Bash(echo \"TSC_EXIT=$?\")",
+      "Bash(CRON_SECRET=smoketest-secret npx next dev -p 3111)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" -X POST http://localhost:3111/api/orders)",
+      "Bash(curl -s -w \" HTTP %{http_code}\\\\n\" -X POST -H \"paddle-signature: bogus\" -d '{\"event_type\":\"adjustment.created\"}' http://localhost:3111/api/webhooks/paddle)",
+      "Bash(curl -s -w \" HTTP %{http_code}\\\\n\" -X POST -d '{}' http://localhost:3111/api/webhooks/replicate/ord_test)",
+      "Bash(npx eslint *)"
     ]
   },
   "enableAllProjectMcpServers": true,

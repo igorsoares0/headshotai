@@ -66,6 +66,20 @@ export function initialGenCount(count: number): number {
   return Math.min(Math.ceil(count * OVERGEN_MARGIN), MAX_GEN_PER_ORDER);
 }
 
+// --- Upload constraints (reqs §9/§10) --------------------------------------
+// Single source of truth for both the client picker (app/dashboard/new) and the
+// server guard in POST /api/orders. The client checks are UX (fail fast, no
+// wasted upload); the server ones are the real limit — every byte here is held
+// in memory at once (buffer → sharp → zip), so an unbounded request is an OOM.
+export const MIN_UPLOADS = 10;
+export const MAX_UPLOADS = 25;
+export const MAX_UPLOAD_BYTES = 15 * 1024 * 1024; // 15MB per photo
+// Below MAX_UPLOADS × MAX_UPLOAD_BYTES on purpose: a batch of 25 phone photos
+// lands around 100-150MB, and bounding the whole request matters more than
+// honoring a pathological 25×15MB upload. Keep the reverse-proxy body limit
+// (see DEPLOY.md) at or just above this number.
+export const MAX_UPLOAD_TOTAL_BYTES = 200 * 1024 * 1024;
+
 /** Spread `total` images across the given style keys as evenly as possible. */
 export function distribute(total: number, keys: string[]): Record<string, number> {
   const base = Math.floor(total / keys.length);
