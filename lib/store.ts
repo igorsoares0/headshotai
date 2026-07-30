@@ -5,6 +5,7 @@
  * Order/Shot types are intentionally kept independent of Prisma's generated
  * types and mapped at this boundary (e.g. createdAt stays epoch-ms).
  */
+import { randomBytes } from "node:crypto";
 import { Prisma } from "@/lib/generated/prisma/client";
 import { prisma } from "./prisma";
 import type { StyleKey } from "./recipe";
@@ -145,6 +146,11 @@ export async function saveOrder(order: Order): Promise<void> {
   });
 }
 
+/**
+ * Order ids are minted from a CSPRNG, not Math.random: `saveOrder` upserts, so a
+ * collision would silently overwrite somebody else's order rather than error.
+ * 64 bits puts that out of reach at any scale this product will see.
+ */
 export function newOrderId(): string {
-  return "ord_" + Math.random().toString(36).slice(2, 10);
+  return "ord_" + randomBytes(8).toString("hex");
 }

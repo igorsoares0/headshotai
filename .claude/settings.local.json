@@ -19,7 +19,16 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" -X POST http://localhost:3111/api/orders)",
       "Bash(curl -s -w \" HTTP %{http_code}\\\\n\" -X POST -H \"paddle-signature: bogus\" -d '{\"event_type\":\"adjustment.created\"}' http://localhost:3111/api/webhooks/paddle)",
       "Bash(curl -s -w \" HTTP %{http_code}\\\\n\" -X POST -d '{}' http://localhost:3111/api/webhooks/replicate/ord_test)",
-      "Bash(npx eslint *)"
+      "Bash(npx eslint *)",
+      "Bash(npm audit *)",
+      "Bash(node -e \"const s=require\\('sharp'\\);console.log\\('sharp',require\\('sharp/package.json'\\).version\\);console.log\\('libvips',s.versions.vips\\)\")",
+      "Bash(npm i *)",
+      "Bash(node -p \"require\\('./node_modules/sharp/package.json'\\).version\")",
+      "Bash(echo \"top-level sharp: $\\(node -p \"require\\('./node_modules/sharp/package.json'\\).version\"\\)\")",
+      "Bash(node -e \"console.log\\(require\\('sharp'\\).versions.vips\\)\")",
+      "Bash(echo \"libvips: $\\(node -e \"console.log\\(require\\('sharp'\\).versions.vips\\)\"\\)\")",
+      "Bash(node -p \"require\\('./node_modules/next/node_modules/sharp/package.json'\\).version\")",
+      "Bash(node /tmp/claude-1000/-mnt-c-allsaas-headshotai/88bfd0f6-eb7d-4c63-bda5-a3334e59d968/scratchpad/sharp-check.mjs)"
     ]
   },
   "enableAllProjectMcpServers": true,

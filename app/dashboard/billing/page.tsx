@@ -10,6 +10,7 @@ const STATUS_LABEL: Record<string, string> = {
   pending: "Pending",
   completed: "Ready to use",
   consumed: "Used",
+  refunded: "Refunded",
 };
 
 function fmtDate(d: Date): string {
@@ -66,7 +67,9 @@ export default async function BillingPage() {
                             ? "bg-electric/10 text-electric"
                             : p.status === "consumed"
                               ? "bg-ink/5 text-muted"
-                              : "bg-amber-500/10 text-amber-600"
+                              : p.status === "refunded"
+                                ? "bg-danger/10 text-danger"
+                                : "bg-amber-500/10 text-amber-600"
                         }`}
                       >
                         {STATUS_LABEL[p.status] ?? p.status}
